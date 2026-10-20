@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Text inside bounded overflow containers</title>
+<style>
+  @font-face { font-family: ReducedMetrics; src: local("Arial"); ascent-override: 2%; descent-override: 2%; line-gap-override: 0%; }
+  html, body { margin: 0; background: #232F3E; color: #FFFFFF; font: 14px/28px Arial, sans-serif; }
+  body { padding: 20px; }
+  section { margin-bottom: 12px; }
+  .clip { width: 240px; height: 39px; overflow: hidden; }
+  .nav { display: flex; flex-wrap: wrap; }
+  .contents { display: contents; }
+  .nav a { display: block; box-sizing: border-box; flex: 0 0 200px; height: 39px; padding: 6px 10px 5px; color: inherit; text-decoration: none; }
+  .below { display: block; margin-top: 52px; }
+  .partial { display: block; margin-top: 28px; }
+  .horizontal { height: 28px; white-space: nowrap; }
+  .horizontal span { display: inline-block; margin-left: 260px; }
+  .relative { position: relative; }
+  .escaping { position: absolute; left: 300px; top: 250px; }
+  .scaled { transform: scale(1.01); }
+  .translated { transform: translate(2px, 3px); }
+  .shadow { text-shadow: 0 -48px 0 #FFFFFF; }
+  .combining { font-size: 40px; }
+  .decorated { text-decoration: underline; }
+  .first-line::first-line { font-size: 40px; }
+  .clip-margin { overflow: clip; overflow-clip-margin: 80px; }
+  .oversized-ink { font: 100px/1 ReducedMetrics, Arial, sans-serif; }
+  .offscreen { margin-top: 1400px; }
+</style>
+<section class="clip nav"><div class="contents"><a id="visible-row" data-overflow="retained">Visible row</a><a id="hidden-row" data-overflow="hidden">Hidden second row</a></div></section>
+<section class="clip"><span id="partial-row" class="partial" data-overflow="retained">Partially visible row</span></section>
+<section class="clip horizontal"><span id="hidden-horizontal" data-overflow="hidden">Hidden horizontal text</span></section>
+<section class="clip"><span id="absolute-escape" class="escaping" data-overflow="retained">Escaping absolute text</span></section>
+<section class="clip scaled"><span id="scaled-text" class="below" data-overflow="retained">Scaled text retained</span></section>
+<section class="clip translated"><span id="translated-hidden" class="below" data-overflow="hidden">Translated hidden text</span></section>
+<section class="clip"><span id="shadow-text" class="below shadow" data-overflow="retained">Visible shadow retained</span></section>
+<section class="clip"><span id="combining-text" class="below combining" data-overflow="retained">A&#x301;&#x301;&#x301;</span></section>
+<section class="clip"><span id="decorated-text" class="below decorated" data-overflow="retained">Decoration retained</span></section>
+<section class="clip"><span id="first-line-text" class="below first-line" data-overflow="retained">Styled first line retained</span></section>
+<section class="clip clip-margin"><span id="expanded-clip-text" class="below" data-overflow="retained">Expanded clip retained</span></section>
+<section class="clip"><span id="oversized-ink-text" class="below oversized-ink" data-overflow="retained">A</span></section>
+<section class="offscreen"><span id="offscreen-text" data-overflow="retained">Document text outside the viewport</span></section>
+</html>

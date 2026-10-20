@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Disclosure visibility</title>
+<style>
+  body { margin: 20px; color: #FFFFFF; background: #212831; font: 16px Arial, sans-serif; }
+  .scenario { display: none; }
+  details { position: relative; display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 120px 120px 160px; padding: 10px 20px; }
+  a { color: inherit; }
+  .boxless { display: contents; }
+  #forced::details-content { content-visibility: visible; }
+  #pseudo-boxless::details-content { display: contents; content-visibility: hidden; }
+  #pseudo-hidden::details-content { content-visibility: hidden; }
+  #pseudo-inline::details-content { display: inline; content-visibility: hidden; }
+  #offscreen { padding-top: 2000px; }
+  .auto { content-visibility: auto; }
+  #stripe::after, #ordinary-stripe::after { content: ''; position: absolute; left: 0; top: 0; width: 6px; height: 100%; background: #D9D9D9; }
+  #ordinary-stripe { position: relative; border: 2px solid #888; padding: 6px; }
+  .right::after { left: auto !important; right: 0; }
+  .cover::after { left: 0 !important; right: 0; width: auto !important; }
+  #overlay { position: relative; }
+  #overlay .paint { position: absolute; inset: 0; background: #555; }
+</style>
+<section class="scenario" id="ordinary"><details id="offers"><summary><span>More offers</span></summary>Direct content<div class="row"><span>123.45</span><a href="#">Offer</a><div>Shop</div></div><summary>Second summary</summary></details></section>
+<section class="scenario" id="nested"><details id="outer"><summary>Outer summary</summary><details open><summary>Inner summary</summary><div>Inner body</div></details></details></section>
+<section class="scenario" id="boxless"><details id="boxless-details"><summary>Boxless summary</summary><div class="boxless">Boxless body</div></details></section>
+<section class="scenario" id="override"><details id="forced"><summary>Forced summary</summary><div>Forced body</div></details></section>
+<section class="scenario" id="contents"><details id="pseudo-boxless"><summary>Contents summary</summary><div>Contents body</div></details></section>
+<section class="scenario" id="hidden"><details open id="pseudo-hidden"><summary>Hidden summary</summary><div>Hidden body</div></details></section>
+<section class="scenario" id="inline"><details id="pseudo-inline"><summary>Inline summary</summary><span>Inline body</span></details></section>
+<section class="scenario" id="slotted"><div id="component"><span>Assigned offer</span></div></section>
+<section class="scenario" id="offscreen"><div>Offscreen text</div><div class="auto"><span>Automatic content visibility</span></div></section>
+<section class="scenario" id="decoration"><details open id="stripe"><summary style="padding-left:20px">Decorated summary</summary><div class="row"><span>123.45</span><a href="#">Offer</a><div>Shop</div></div></details></section>
+<section class="scenario" id="ordinary-decoration"><div id="ordinary-stripe"><div class="row"><span>123.45</span><a href="#">Offer</a><div>Shop</div></div></div></section>
+<section class="scenario" id="overlay"><span>Covered text</span><div class="paint"></div></section>
+<script>
+  document.getElementById('component').attachShadow({mode:'open'}).innerHTML = '<details><summary>Internal summary</summary><slot></slot></details>';
+</script>
+</html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Placeholder contrast and nonpainting decoration</title>
+<style>
+  html, body { background: #121212; color: #FFF; font: 16px sans-serif; }
+  .masthead { position: relative; background: #121212; padding: 20px; }
+  .masthead::after { content: ""; display: block; position: absolute; width: 100%; height: 5px; bottom: 0; }
+  input { display: block; margin: 12px 0; color: #FFF; background: #121212; border: 1px solid #444; font: 16px sans-serif; }
+  input::placeholder { color: #AAA; opacity: 1; }
+  #native::placeholder { color: revert; opacity: revert; }
+  #translucent::placeholder { color: #FFF; opacity: .54; font-size: 24px; font-weight: 700; }
+  #gradient { background-image: linear-gradient(#121212, #333); }
+  .group { opacity: .8; }
+  .painted, .painted-border { position: relative; }
+  .painted::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.4); }
+  .painted-border::before { content: ""; position: absolute; inset: 0; border: 8px solid #FFF; }
+  #create { display: inline-block; background: #333; color: #FFF; padding: 8px; }
+</style>
+<div class="masthead">
+  <input id="placeholder" type="search" placeholder="PRIVATE_PLACEHOLDER_SENTINEL">
+  <input id="translucent" placeholder="PRIVATE_TRANSLUCENT_SENTINEL">
+  <input id="native" placeholder="PRIVATE_NATIVE_SENTINEL">
+  <input id="empty" placeholder="">
+  <input id="populated" placeholder="PRIVATE_HIDDEN_PLACEHOLDER_SENTINEL" value="PRIVATE_INPUT_SENTINEL">
+  <input id="gradient" placeholder="PRIVATE_GRADIENT_SENTINEL">
+  <div class="group"><input id="group" placeholder="PRIVATE_GROUP_SENTINEL"></div>
+  <input id="disabled" placeholder="PRIVATE_DISABLED_SENTINEL" disabled>
+  <button id="create"><span id="button-text">Create</span></button>
+  <div class="painted"><span id="painted-text">Covered text</span></div>
+  <div class="painted-border"><span id="border-text">Bordered text</span></div>
+</div>
+</html>

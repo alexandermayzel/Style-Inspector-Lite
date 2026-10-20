@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Clamped multiline return links</title>
+<style>
+  html, body { margin: 0; background: #FFF; font: 12px/16px Arial, sans-serif; }
+  body { padding: 24px; }
+  .cases { display: flex; flex-wrap: wrap; gap: 40px; }
+  .case { position: relative; width: 160px; height: 160px; }
+  .clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+    width: 102px; overflow: hidden; color: #2162A1; text-decoration: none; }
+  #reported:hover { color: #0C3353; }
+  .next-row { position: relative; z-index: 1; width: 102px; height: 60px; background: #DDD; }
+  .popup { display: none; position: absolute; left: 0; top: 16px; width: 102px; height: 16px;
+    z-index: 1; background: #999; }
+  .height-clip { display: flow-root; -webkit-line-clamp: unset; height: 48px; }
+  .partial { display: flow-root; -webkit-line-clamp: unset; height: 42px; }
+  .shadow { text-shadow: 0 -35px #000; }
+  .offscreen { position: absolute; top: 1800px; left: 24px; }
+  #partial-cover { top: 32px; height: 10px; }
+</style>
+<div class="cases">
+  <div class="case"><span id="reported" class="clamped">Returns can be requested within fourteen days after the delivery of this example item to your address.</span><div class="next-row"></div><div id="popup" class="popup"></div></div>
+  <div class="case"><span id="height-clipped" class="clamped height-clip">Returns can be requested within fourteen days after the delivery of this example item to your address.</span><div class="next-row"></div></div>
+  <div class="case"><span id="partial" class="clamped partial">Returns can be requested within fourteen days after the delivery of this example item.</span><div class="next-row"></div><div id="partial-cover" class="popup"></div></div>
+  <div class="case"><span id="shadow" class="clamped shadow">Returns can be requested within fourteen days after the delivery of this example item.</span><div class="next-row"></div></div>
+  <div class="case"><span id="split" class="clamped"><span>Returns can be requested </span><span>within fourteen days after the delivery of this example item.</span></span><div class="next-row"></div></div>
+</div>
+<div class="case offscreen"><span id="offscreen" class="clamped">Returns can be requested within fourteen days after the delivery of this example item.</span><div class="next-row"></div></div>
+</html>

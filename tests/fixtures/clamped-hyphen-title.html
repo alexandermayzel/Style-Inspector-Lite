@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Clipped synthetic titles with natural hyphen breaks</title>
+<style>
+  html, body { margin: 0; background: #FFF; color: #111; font: 14px/22px Arial, sans-serif; }
+  body { padding: 24px; }
+  .cases { display: flex; gap: 32px; }
+  .case { position: relative; width: 112px; background: #111; }
+  .title { display: block; width: 112px; max-height: 44px; overflow: hidden; margin: 0; color: #99C3FF; font: 14px/22px Arial, sans-serif, "Noto Color Emoji"; }
+  .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .next-tile { width: 112px; height: 200px; background: #667; }
+  .click-area { position: absolute; inset: 0; z-index: 1; background: transparent; outline: none; }
+  .cover { display: none; position: absolute; z-index: 2; left: 0; top: 22px; width: 112px; height: 22px; background: #999; }
+</style>
+<!-- Synthetic text only. Natural ASCII hyphens break in a visible or hidden
+     line. An empty clickable layer covers each card, and painted tiles catch
+     accidental sampling of clipped text fragments. -->
+<div class="cases">
+  <div class="case"><a class="click-area" href="#" aria-label="Example product"></a><div id="clamp-visible-hyphen" class="title clamp">A synthetic Over-ear model with Noise-Cancelling and Model-1200 comfortable sound quality</div><div class="next-tile"></div><div id="cover" class="cover"></div></div>
+  <div class="case"><a class="click-area" href="#" aria-label="Example product"></a><div id="clamp-hidden-hyphen" class="title clamp">EXAMPLE Model-1200 Premium Noise Cancelling, Over-ear headphones Bluetooth black</div><div class="next-tile"></div></div>
+  <div class="case"><a class="click-area" href="#" aria-label="Example product"></a><div id="height-visible-hyphen" class="title">A synthetic Over-ear model with Noise-Cancelling and Model-1200 comfortable sound quality</div><div class="next-tile"></div></div>
+  <div class="case"><a class="click-area" href="#" aria-label="Example product"></a><div id="height-hidden-hyphen" class="title">EXAMPLE Model-1200 Premium Noise Cancelling, Over-ear headphones Bluetooth black</div><div class="next-tile"></div></div>
+</div>
+</html>

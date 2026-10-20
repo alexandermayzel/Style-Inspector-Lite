@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Clipped synthetic titles containing a euro sign</title>
+<style>
+  html, body { margin: 0; background: #FFF; color: #111; font: 14px/20px Arial, sans-serif; }
+  body { padding: 24px; }
+  .cases { display: flex; flex-wrap: wrap; gap: 32px; }
+  .case { position: relative; width: 148px; background: #222; }
+  .title { display: flow-root; width: 148px; max-height: 60px; overflow: hidden; margin: 0; color: #FFF; font: 14px/20px Arial, sans-serif; }
+  .line-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+  .next-tile { width: 148px; height: 240px; background: #667; }
+  .cover { display: none; position: absolute; z-index: 1; left: 0; top: 20px; width: 148px; height: 20px; background: #999; }
+</style>
+<!-- Only synthetic text. Each title has one text node and three visible lines.
+     The following painted tile catches incorrect sampling of hidden lines.
+     The euro sign is either in the first line or exclusively in a hidden line. -->
+<div class="cases">
+  <div class="case"><p id="height-visible-euro" class="title">25€ example offer with several comfortable nights in a quiet hotel and breakfast for two travellers during the summer season.</p><div class="next-tile"></div><div id="cover" class="cover"></div></div>
+  <div class="case"><p id="height-hidden-euro" class="title">An example offer with several comfortable nights in a quiet hotel and breakfast for two travellers during the summer season from 185€ per person.</p><div class="next-tile"></div></div>
+  <div class="case"><p id="clamp-visible-euro" class="title line-clamp">25€ example offer with several comfortable nights in a quiet hotel and breakfast for two travellers during the summer season.</p><div class="next-tile"></div></div>
+  <div class="case"><p id="clamp-hidden-euro" class="title line-clamp">An example offer with several comfortable nights in a quiet hotel and breakfast for two travellers during the summer season from 185€ per person.</p><div class="next-tile"></div></div>
+</div>
+</html>

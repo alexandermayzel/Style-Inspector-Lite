@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Light DOM text visibility through slots</title>
+<style>
+  html, body { margin: 0; background: #FFF; color: #212121; font: 14px/24px Arial, sans-serif; }
+  body { padding: 24px; }
+  .scenario { position: relative; width: 480px; min-height: 80px; margin-bottom: 16px; }
+  sil-skip, sil-action, sil-surface { display: block; position: relative; width: 240px; min-height: 32px; }
+  sil-action { width: fit-content; }
+  .slotted { display: inline-block; }
+  #visible-override { visibility: visible; }
+  #direct-override-host { visibility: hidden; }
+  #slotted-popover { position: fixed; inset: 120px auto auto 40px; margin: 0; border: 1px solid #333; padding: 8px; color: #212121; background: #FFF; }
+</style>
+<div id="focus-sink" tabindex="-1"></div>
+<!-- These components contain only synthetic text. The audit still inventories
+     light DOM; shadow wrappers supply rendering context, not new text runs. -->
+<section class="scenario"><sil-skip id="skip-host"><sil-action id="skip-action">Synthetic navigation shortcut</sil-action></sil-skip></section>
+<section class="scenario"><sil-surface id="text-host">Direct assigned preview</sil-surface></section>
+<section class="scenario"><sil-surface id="visible-host"><span id="visible-slotted" class="slotted">Visible assigned text</span></sil-surface></section>
+<section class="scenario"><sil-surface id="contents-host"><span id="contents-slotted" class="slotted">Boxless slot text</span></sil-surface></section>
+<section class="scenario"><sil-surface id="override-host"><span id="visible-override" class="slotted">Overridden visible text</span></sil-surface></section>
+<section class="scenario"><sil-surface id="direct-override-host">Direct text inherits visible slot</sil-surface></section>
+<section class="scenario"><sil-surface id="contents-visibility-host"><span id="contents-visibility-slotted" class="slotted">Boxless slot content remains visible</span></sil-surface></section>
+<section class="scenario"><sil-surface id="wrapper-contents-host"><span id="wrapper-contents-slotted" class="slotted">Boxless wrapper content remains visible</span></sil-surface></section>
+<section class="scenario"><sil-surface id="faint-host"><span id="faint-slotted" class="slotted">Faint assigned text</span></sil-surface></section>
+<section class="scenario"><sil-surface id="popover-host"><div id="slotted-popover" popover="manual">Escaping assigned popover</div></sil-surface></section>
+<section class="scenario"><sil-surface id="reassign-host"><span id="reassigned-text" class="slotted" slot="hidden">Reassigned preview</span></sil-surface></section>
+<section class="scenario"><sil-surface id="unassigned-host">Unassigned light text</sil-surface></section>
+<script>
+  document.getElementById('skip-action').attachShadow({ mode: 'open' }).innerHTML = `
+    <style>
+      button { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 12px; border: 1px solid #555; color: inherit; background: #FFF; font: inherit; }
+    </style><button type="button"><span><slot></slot></span></button>`;
+  document.getElementById('skip-host').attachShadow({ mode: 'open' }).innerHTML = `
+    <style>
+      :host { filter: drop-shadow(0 1px 2px #0004); }
+      .skip-link { display: flex; opacity: 0; padding: 8px; background: #FFF; }
+      .skip-link:not(:focus-within) { width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; white-space: nowrap; }
+      .skip-link:focus-within { opacity: 1; }
+    </style><div class="skip-link"><slot></slot></div>`;
+  const surface = (id, wrapperStyle = '', slotStyle = '') => {
+    const root = document.getElementById(id).attachShadow({ mode: 'open' });
+    root.innerHTML = `<style>.surface { min-height: 32px; padding: 4px; background: #FFF; }</style><div class="surface" style="${wrapperStyle}"><slot style="${slotStyle}"></slot></div>`;
+  };
+  surface('text-host', 'opacity: 0');
+  surface('visible-host');
+  surface('contents-host', '', 'display: contents; opacity: 0');
+  surface('override-host', 'visibility: hidden');
+  surface('direct-override-host', '', 'visibility: visible');
+  surface('contents-visibility-host', '', 'display: contents; content-visibility: hidden');
+  surface('wrapper-contents-host', 'display: contents; content-visibility: hidden');
+  surface('faint-host', 'opacity: .01');
+  surface('popover-host', 'opacity: 0');
+  document.getElementById('reassign-host').attachShadow({ mode: 'open' }).innerHTML = `
+    <div class="hidden-surface" style="opacity: 0; min-height: 32px"><slot name="hidden"></slot></div>
+    <div class="visible-surface" style="min-height: 32px"><slot name="visible"></slot></div>`;
+  document.getElementById('unassigned-host').attachShadow({ mode: 'open' }).innerHTML = '<div>Internal shadow text stays outside the audit inventory</div>';
+</script>
+</html>

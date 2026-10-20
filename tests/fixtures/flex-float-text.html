@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Offscreen flex and grid text with ineffective floats</title>
+<style>
+  * { box-sizing: border-box; }
+  html { background: white; }
+  body { margin: 0; padding: 2000px 0 40px; font: 13.5px/16px Arial, sans-serif; }
+  .scenario { position: relative; width: 600px; height: 72px; margin: 12px; padding: 24px; background: #131921; color: white; }
+  .layout { min-height: 24px; }
+  fieldset.layout { margin: 0; padding: 0; border: 0; }
+  .label { display: block; pointer-events: none; }
+  .left { float: left; }
+  .right { float: right; }
+  .flex { display: flex; }
+  .inline-flex { display: inline-flex; }
+  .grid { display: grid; }
+  .inline-grid { display: inline-grid; }
+  .contents { display: contents; }
+  .relative { position: relative; left: 1px; }
+  .negative { margin-top: -1px; }
+  .translated { transform: translateX(1px); }
+  .scaled { transform: scale(1.1); }
+  .absolute { position: absolute; top: 24px; left: 24px; }
+  .overlay { display: none; }
+  .paint { position: absolute; left: 23px; top: 23px; width: 180px; height: 24px; background: #eee; z-index: 2; }
+</style>
+<div class="scenario good"><div class="layout flex"><span id="flex-left" class="label left">Flex left</span></div></div>
+<div class="scenario good"><div class="layout flex"><span id="flex-right" class="label right">Flex right</span></div></div>
+<div class="scenario good"><div class="layout inline-flex"><span id="inline-flex-left" class="label left">Inline flex left</span></div></div>
+<div class="scenario good"><div class="layout inline-flex"><span id="inline-flex-right" class="label right">Inline flex right</span></div></div>
+<div class="scenario good"><div class="layout grid"><span id="grid-left" class="label left">Grid left</span></div></div>
+<div class="scenario good"><div class="layout grid"><span id="grid-right" class="label right">Grid right</span></div></div>
+<div class="scenario good"><div class="layout inline-grid"><span id="inline-grid-left" class="label left">Inline grid left</span></div></div>
+<div class="scenario good"><div class="layout inline-grid"><span id="inline-grid-right" class="label right">Inline grid right</span></div></div>
+<div class="scenario uncertain"><div class="layout"><span class="label left">Real left float</span></div></div>
+<div class="scenario uncertain"><div class="layout"><span class="label right">Real right float</span></div></div>
+<div class="scenario uncertain"><div class="layout flex"><span class="label left relative">Relative offset</span></div></div>
+<div class="scenario uncertain"><div class="layout flex"><span class="label left negative">Negative margin</span></div></div>
+<div class="scenario uncertain"><div class="layout flex"><span class="label left translated">Translated item</span></div></div>
+<div class="scenario uncertain"><div class="layout flex"><span class="label left scaled">Scaled item</span></div></div>
+<div class="scenario uncertain"><div class="layout flex"><span class="label left absolute">Absolute item</span></div></div>
+<div class="scenario uncertain"><div id="slotted" class="layout flex"><span class="label left">Assigned slot</span></div></div>
+<div class="scenario uncertain"><div class="layout flex"><div class="contents"><span class="label left">Boxless wrapper</span></div></div></div>
+<div class="scenario uncertain"><details open class="layout flex"><summary style="display:none"></summary><span class="label left">Details child</span></details></div>
+<div class="scenario uncertain"><fieldset class="layout flex"><span class="label left">Fieldset child</span></fieldset></div>
+<div class="scenario overlay"><div class="layout flex"><span class="label left">Covered item</span></div><div class="paint"></div></div>
+<script>
+  document.getElementById('slotted').attachShadow({ mode: 'open' }).innerHTML = '<div><slot></slot></div>';
+</script>
+</html>

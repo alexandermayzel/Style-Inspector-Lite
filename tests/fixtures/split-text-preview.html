@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Adjacent text nodes in clipped message previews</title>
+<style>
+  html, body { margin: 0; background: #161717; color: rgba(255, 255, 255, .6); font: 14px/20px Arial, sans-serif; }
+  .row { display: flex; width: 1800px; height: 40px; }
+  .preview { width: 392.1px; min-width: 392.1px; }
+  .message { display: block; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .other { flex: 1; background: #AAA; }
+  .shadow { text-shadow: -160px 0 #FFF; }
+  .box-shadow { box-shadow: 0 2px 4px #0008; }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const row = (id, pieces, expected, uncertain = false, className = '', ancestorClass = '') => {
+      const row = document.createElement('div'); row.className = 'row';
+      const wrapper = document.createElement('div'); wrapper.className = 'preview ' + ancestorClass;
+      const target = document.createElement('span'); target.id = id; target.className = 'message ' + className;
+      target.dataset.splitCount = String(expected); target.dataset.uncertain = String(uncertain);
+      // Adjacent Text nodes serialize as one HTML string, but have independent
+      // ranges and boundary-space metrics. Keep this topology in the fixture.
+      target.append(...pieces.map(value => document.createTextNode(value)));
+      const other = document.createElement('div'); other.className = 'other';
+      wrapper.append(target); row.append(wrapper, other); document.body.append(row);
+    };
+    const longVisible = 'Synthetic visible preview '.repeat(5);
+    row('split-latin', Array.from({ length: 12 }, (_, i) => `Segment ${i + 1} ` + 'synthetic preview '.repeat(3)), 1);
+    row('split-multilingual', ['Preview ', ...Array.from({ length: 11 }, (_, i) => ['Prüfung über mehrere Wörter. ', 'L’exemple contient du texte. ', 'Пример текста сообщения. '][i % 3].repeat(3))], 2);
+    row('split-long', ['Preview ', longVisible, 'Long hidden fragment with space. '.repeat(40)], 2);
+    row('split-nbsp', ['Preview ', longVisible, '\u00A0Hidden\u00A0sample\u00A0 '], 2);
+    row('split-marks', [longVisible, 'A\u0301\u0301\u0301'], 2, true);
+    row('split-bidi', [longVisible, '\u2068Пример текста\u2069'], 2, true);
+    row('split-budget', [longVisible, 'Bounded work '.repeat(400)], 2, true);
+    row('split-shadow', [longVisible, 'Hidden text with visible shadow '], 2, true, 'shadow');
+    row('split-joining', ['Wide'.repeat(30) + 'f', 'i'], 2, true);
+    const shadowPieces = ['Initial preview ' + 'sample '.repeat(3), 'Second preview ' + 'sample '.repeat(5),
+      ...Array.from({ length: 10 }, () => 'synthetic preview '.repeat(6))];
+    row('split-box-shadow', shadowPieces, 2, false, 'box-shadow');
+    row('split-ancestor-box-shadow', shadowPieces, 2, false, '', 'box-shadow');
+  });
+</script>
+<body></body>
+</html>

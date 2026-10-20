@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Audit snapshots and fresh element measurements</title>
+<style>
+  html, body { margin: 0; background: #232F3E; color: #FFFFFF; font: 14px/28px Arial, sans-serif; }
+  main { position: relative; margin: 32px; padding: 16px; width: 300px; }
+  a { display: block; width: 200px; color: inherit; text-decoration: none; }
+  #stable { margin-top: 40px; }
+  #overlay { position: absolute; left: 16px; top: 16px; width: 200px; height: 28px; z-index: 1; background: #000000; }
+  #unrelated { position: absolute; left: 48px; top: 240px; }
+</style>
+<style id="dynamic-rules">
+  #overlay { display: block; }
+  #unrelated { display: none; }
+</style>
+<main>
+  <a id="covered" href="#covered">Covered navigation link</a>
+  <a id="stable" href="#stable">Stable navigation link</a>
+  <div id="overlay"></div>
+</main>
+<a id="unrelated" href="#unrelated">Unrelated fresh selection</a>
+</html>

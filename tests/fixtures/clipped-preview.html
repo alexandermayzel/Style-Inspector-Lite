@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Clipped message preview geometry</title>
+<style>
+  html, body { margin: 0; background: #161717; color: rgba(255, 255, 255, .6); font: 14px/20px Arial, sans-serif; }
+  .row { display: flex; position: relative; width: 900px; height: 40px; }
+  .preview { display: flex; align-items: flex-start; flex: 0 0 180px; min-width: 0; }
+  .status { display: flex; flex: 0 0 20px; }
+  .message { display: block; position: relative; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pane { flex: 1; background: #AABBCC; }
+  .transparent { pointer-events: none; }
+  .ancestor { overflow: hidden; }
+  .ancestor .message { overflow: visible; }
+  .visible { overflow: visible; }
+  .overlay { position: absolute; left: 20px; top: 0; width: 160px; height: 20px; z-index: 3; background: #A00000; }
+  .scaled { transform: scale(1.05); transform-origin: top left; }
+  .escape { position: absolute; left: 230px; top: 0; width: 650px; overflow: visible; }
+</style>
+<div class="row"><div class="preview"><span class="status" aria-hidden="true"><svg viewBox="0 0 20 20" width="20" height="20"><path fill="currentColor" d="M2 10l4 4 9-9 2 2-11 11-6-6z"/></svg></span><span id="short" class="message" data-preview="pass">Sample</span></div><div class="pane"></div></div>
+<div class="row"><div class="preview"><span class="status"></span><span id="ellipsis" class="message" data-preview="pass">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div></div>
+<div class="row"><div class="preview"><span class="status"></span><span id="pointer-none" class="message transparent" data-preview="pass">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div></div>
+<div class="row"><div class="preview ancestor"><span class="status"></span><span id="ancestor" class="message" data-preview="pass">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div></div>
+<div class="row"><div class="preview"><span class="status"></span><span id="scrolled" class="message" data-preview="pass">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div></div>
+<div class="row"><div class="preview"><span class="status"></span><span id="visible" class="message visible" data-preview="manual">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div></div>
+<div class="row"><div class="preview"><span class="status"></span><span id="covered" class="message" data-preview="manual">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div><div class="overlay"></div></div>
+<div class="row"><div class="preview ancestor"><span id="escape" class="message escape transparent" data-preview="manual">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div></div>
+<div class="row"><div class="preview scaled"><span class="status"></span><span id="scaled" class="message" data-preview="manual">A synthetic message preview extends far beyond the visible list into another pane of the interface.</span></div><div class="pane"></div></div>
+<script>document.getElementById('scrolled').scrollLeft = 60;</script>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Separate background layers behind pointer-transparent text</title>
+<style>
+  html, body { margin: 0; background: #0F0F0F; color: #F1F1F1; font: 14px/20px Arial, sans-serif; }
+  main { display: grid; grid-template-columns: repeat(3, 230px); gap: 12px; margin: 16px; }
+  .case { position: relative; z-index: 1; height: 70px; }
+  .backdrop { position: absolute; z-index: -1; inset: 0; background: #0F0F0F; }
+  .button { position: relative; display: flex; width: max-content; margin: 14px; padding: 0 16px; height: 40px; align-items: center; background: rgb(255 255 255 / 0.1); border-radius: 20px; }
+  .label { pointer-events: none; z-index: 1; white-space: nowrap; }
+  .underlay { position: absolute; inset: 0; background: #A00000; }
+  .front { position: absolute; z-index: 4; inset: 0; background: #FFFFFF; }
+  .generated::after { content: ""; position: absolute; inset: 0; background: red; }
+</style>
+<div class="underlay"></div>
+<main></main>
+<script>
+  const cases = [
+    ['create', 'pass', ''],
+    ['different', 'pass', 'background:#333333'],
+    ['isolated', 'pass', ''],
+    ['translated', 'pass', ''],
+    ['zero-z', 'manual', 'z-index:0'],
+    ['positive-z', 'manual', 'z-index:3'],
+    ['translucent', 'manual', 'background:rgb(15 15 15 / 0.5)'],
+    ['partial', 'manual', 'left:70px'],
+    ['rounded', 'manual', 'border-radius:40px'],
+    ['gradient', 'manual', 'background:linear-gradient(#111,#333)'],
+    ['filtered', 'manual', 'filter:blur(2px)'],
+    ['masked', 'manual', 'mask-image:linear-gradient(black,transparent)'],
+    ['pseudo', 'manual', ''],
+    ['other-context', 'manual', ''],
+    ['negative-text', 'manual', ''],
+    ['front-overlay', 'manual', ''],
+  ];
+  for (const [id, expected, css] of cases) {
+    const outer = document.createElement('section'); outer.className = 'case';
+    const backdrop = document.createElement('div'); backdrop.className = 'backdrop'; backdrop.style.cssText = css;
+    const button = document.createElement('div'); button.className = 'button';
+    const label = document.createElement('span'); label.className = 'label'; label.id = id; label.dataset.background = expected;
+    label.textContent = 'Create diagnostic'; button.append(label); outer.append(backdrop, button);
+    if (id === 'isolated') { outer.style.zIndex = 'auto'; outer.style.isolation = 'isolate'; }
+    if (id === 'translated') { outer.style.zIndex = 'auto'; outer.style.transform = 'translateX(0px)'; }
+    if (id === 'pseudo') backdrop.classList.add('generated');
+    if (id === 'other-context') { const branch = document.createElement('div'); branch.style.cssText = 'position:absolute;inset:0;z-index:2'; branch.append(backdrop); outer.prepend(branch); }
+    if (id === 'negative-text') button.style.zIndex = '-2';
+    if (id === 'front-overlay') { const front = document.createElement('div'); front.className = 'front'; outer.append(front); }
+    document.querySelector('main').append(outer);
+  }
+</script>
+</html>

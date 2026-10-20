@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Single-line timestamps inside a scrolling message area</title>
+<style>
+  html, body { margin: 0; background: #0B141A; color: rgba(255, 255, 255, .6); font: 12px/16px Arial, sans-serif; text-rendering: optimizeLegibility; font-feature-settings: "kern"; }
+  #chat { position: relative; width: 320px; height: 120px; margin: 24px; overflow: auto; }
+  #messages { min-height: 600px; }
+  .bubble { position: relative; box-sizing: border-box; height: 60px; padding: 8px; margin-bottom: 120px; background: #144D37; }
+  .body { height: 24px; }
+  .reserve { display: inline-flex; visibility: hidden; height: 0; vertical-align: middle; }
+  .metadata { position: relative; z-index: 10; float: right; margin: -10px 0 -5px 4px; }
+  .time-row { display: flex; align-items: center; height: 15px; white-space: nowrap; }
+  .time-wrap { display: inline-block; vertical-align: top; }
+  .time { display: inline; white-space: pre-line; word-break: break-word; overflow-wrap: break-word; font: inherit; }
+  .tick { display: inline-block; width: 16px; height: 16px; margin-left: 4px; }
+  #composer { position: absolute; left: 24px; top: 150px; width: 320px; height: 500px; background: #26313A; }
+  #cover { display: none; position: absolute; inset: 0; z-index: 20; background: #A00000; }
+  #offscreen { position: absolute; top: 1800px; left: 24px; width: 200px; padding: 12px; background: #144D37; }
+</style>
+<div id="chat"><div id="messages">
+  <div class="bubble" id="first-bubble"><div class="body"><span class="reserve" aria-hidden="true"><span>09:15</span></span></div><div class="metadata"><div class="time-row" role="button"><span class="time-wrap" dir="auto"><span class="time" id="first-time">09:15</span></span><svg class="tick" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8 6 12 14 3" fill="none" stroke="currentColor"/></svg></div></div></div>
+  <div class="bubble" id="second-bubble"><div class="body"><span class="reserve" aria-hidden="true"><span>09:16</span></span></div><div class="metadata"><div class="time-row" role="button"><span class="time-wrap" dir="auto"><span class="time" id="second-time">09:16</span></span><svg class="tick" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8 6 12 14 3" fill="none" stroke="currentColor"/></svg></div></div><div id="cover"></div></div>
+</div></div>
+<div id="composer"></div>
+<div id="offscreen"><span class="time" id="offscreen-time">09:17</span></div>
+</html>

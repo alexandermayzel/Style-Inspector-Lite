@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Style Inspector Lite test fixture</title>
+<style>
+html { background:#fff; color:#222; font:16px/1.5 system-ui,sans-serif; }
+body { margin:32px; max-width:800px; }
+h1 { font-size:28px; margin-bottom:12px; }
+.card { background:#fff; border:1px solid #d4dae5; border-radius:12px; padding:16px 24px; margin:18px 0; }
+#sample { color:rgb(148,148,148); background:#fff; font-family:"Trebuchet MS",Arial,sans-serif; font-size:11px; font-weight:400; line-height:18px; padding:12px 18px 15px 9px; border:2px solid #cbd5e1; border-radius:8px; width:320px; box-sizing:border-box; }
+#large { color:#888; font-size:24px; } #bold { color:#888; font-size:18.6666666667px; font-weight:700; }
+#alpha { background:rgb(20 40 60 / .3); color:rgb(0 0 0 / .7); }
+#gradient { background:radial-gradient(#fff,#eee); font-size:10px; }
+#inherited { color:#333; } #mixed small { font-size:11.99px; } #exact {font-size:12px;}
+#hidden {display:none;} #transformed { transform:scale(.9); } .flex {display:flex; gap:13px;} .grid {display:grid;grid-template-columns:1fr 2fr;gap:7px;}
+@media(max-width:700px) {#sample {width:230px;}}
+</style></head><body>
+<h1>Local inspector test page</h1>
+<p class="card" id="sample">A deliberately faint, small text sample.</p>
+<p id="good">Black text on an explicit white canvas.</p>
+<p id="large">Large text example</p><p id="bold">Bold text example</p>
+<p id="alpha" class="card">Alpha-composited example</p>
+<p id="gradient" class="card">Unsupported radial gradient requires manual contrast review, but small text is measurable.</p>
+<div class="card"><p id="inherited">Inherited solid background</p></div>
+<p id="mixed">A parent with <small>small inline text</small> and regular text.</p>
+<p id="exact">Exactly 12 CSS pixels</p><p id="hidden">Invisible text</p>
+<p id="transformed">Transformed CSS size limitation</p>
+<div class="flex"><span>Flex one</span><span>Flex two</span></div>
+<div class="grid"><span>Grid one</span><span>Grid two</span></div>
+<a id="link" href="#clicked">Test link</a>
+<form id="form"><label id="label" for="input">Test label</label><input id="input" value="PRIVATE_INPUT_SENTINEL"><button id="submit">Submit</button></form>
+<button id="event-button">Pointer/mouse/click fixture</button>
+<p id="removable">This element can be removed during a test.</p>
+<iframe title="unsupported frame" srcdoc="<p>Frame text</p>"></iframe>
+<div id="shadow"></div>
+<script>
+window.fixtureEvents={pointerdown:0,mousedown:0,click:0,submit:0};
+for(const type of ['pointerdown','mousedown','click'])document.querySelector('#event-button').addEventListener(type,()=>window.fixtureEvents[type]++);
+document.querySelector('#form').addEventListener('submit',e=>{e.preventDefault();window.fixtureEvents.submit++;});
+document.querySelector('#shadow').attachShadow({mode:'open'}).innerHTML='<p>Shadow text outside scope</p>';
+</script></body></html>

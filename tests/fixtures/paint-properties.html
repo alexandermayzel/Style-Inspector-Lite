@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Paint properties and editable text boundaries</title>
+<style>
+  html, body { background: #fff; color: #000; font: 16px/24px sans-serif; }
+  body { margin: 20px; }
+  .row { margin: 12px 0; }
+  .boxless { display: contents; background: #000; color: #fff; }
+  .fill { color: #000; -webkit-text-fill-color: #777; }
+  .stroke { color: #000; -webkit-text-stroke: 1px #f00; }
+</style>
+<div class="row" id="ordinary">Ordinary text</div>
+<div class="row"><span class="boxless" id="boxless">Boxless background</span></div>
+<div class="row"><span class="boxless"><span id="boxless-child">Boxless ancestor</span></span></div>
+<div class="row fill" id="fill">Separate glyph fill</div>
+<div class="row fill"><span id="inherited-fill">Inherited glyph fill</span></div>
+<div class="row stroke" id="stroke">Outlined glyphs</div>
+<div class="row" contenteditable="plaintext-only"><span>Private editor sentinel one</span></div>
+<div class="row" contenteditable="TRUE"><span>Private editor sentinel two</span></div>
+<div class="row" role="textbox"><span>Private editor sentinel three</span></div>
+<div class="row" contenteditable="false">Ordinary noneditable text</div>

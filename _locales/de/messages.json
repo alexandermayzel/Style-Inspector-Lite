@@ -1,0 +1,1383 @@
+{
+  "textAreaUnavailable": {
+    "message": "Der zuvor gewählte Textbereich ist in dieser Messung nicht mehr verfügbar. Wähle einen anderen Bereich ausdrücklich aus.",
+    "description": "Prevents silently substituting another text area's contrast after a new measurement."
+  },
+  "elementTextTitle": {
+    "message": "Elementtext",
+    "description": "Style Inspector Lite: elementTextTitle"
+  },
+  "textAreaContent": {
+    "message": "Text des Textbereichs",
+    "description": "Style Inspector Lite: textAreaContent"
+  },
+  "actionCopyText": {
+    "message": "Text kopieren",
+    "description": "Style Inspector Lite: actionCopyText"
+  },
+  "textExcerptTruncated": {
+    "message": "Textauszug wurde gekürzt.",
+    "description": "Style Inspector Lite: textExcerptTruncated"
+  },
+  "textExcerptUnavailable": {
+    "message": "Für diesen Bereich ist kein kopierbarer Textauszug verfügbar.",
+    "description": "Style Inspector Lite: textExcerptUnavailable"
+  },
+  "manualPaletteHint": { "message": "Wähle oben eine Farbe oder nutze die Regler. Ein Farbtonwechsel macht auch Schwarz, Weiß oder Grau farbig.", "description": "Pointer and keyboard options, including hue selection from an achromatic color." },
+  "manualHue": { "message": "Farbton", "description": "Hue slider in degrees." },
+  "manualSaturation": { "message": "Sättigung", "description": "Saturation slider in percent." },
+  "manualValue": { "message": "Helligkeit", "description": "HSV brightness slider in percent." },
+  "manualBackground": { "message": "Hintergrundfarbe", "description": "Background color entered into the manual calculator." },
+  "manualContrastTitle": { "message": "Manueller Kontrasttest", "description": "Local contrast calculator without a selected page element." },
+  "manualContrastScope": { "message": "Eingegebene Farben, keine Messung der Webseite. Vergleiche hier deckende Text- und Hintergrundfarben.", "description": "Separates manually entered colors from inspected page measurements." },
+  "manualHexHint": { "message": "HEX: #RGB oder #RRGGBB", "description": "Supported opaque HEX formats for manual contrast input." },
+  "manualHexError": { "message": "Gib #RGB oder #RRGGBB ein. Transparenz und andere Formate werden nicht unterstützt.", "description": "Accessible validation error for manual HEX input." },
+  "manualPickColor": { "message": "$value1$ wählen", "description": "Accessible label for the inline manual color palette.", "placeholders": { "value1": { "content": "$1" } } },
+  "manualLargeTextHelp": { "message": "Großer Text: mindestens 24 CSS-px oder 14 pt bei Schriftstärke 700 oder höher.", "description": "Explains the large-text category of the manual comparison." },
+  "manualCopyReport": { "message": "Manuellen Farbvergleich kopieren", "description": "Footer copy action for the local contrast calculator." },
+  "manualExportUnavailable": { "message": "Manuelle Farben enthalten keine Seitenmessung zum Exportieren. Nutze Kopieren für den Vergleich.", "description": "Explains why file export is unavailable in manual contrast mode." },
+  "cssColorsOnly": { "message": "Nur CSS-Farben", "description": "Scope of the conditional AA/AAA comparison." },
+  "cssThreshold": { "message": "$value1$-Schwelle", "description": "Conditional CSS color threshold, never a verdict about page rendering.", "placeholders": { "value1": { "content": "$1" } } },
+  "cssThresholdReached": { "message": "Erreicht", "description": "The CSS color pair reaches this contrast threshold." },
+  "cssThresholdBelow": { "message": "Unterschritten", "description": "The CSS color pair does not reach this contrast threshold." },
+  "cssPageUnverified": { "message": "Seitendarstellung ungeprüft", "description": "The actual rendered page has no reliable contrast verdict." },
+  "cssThresholdUnknown": { "message": "AA/AAA-Schwellen sind wegen unbekannter Schriftgröße oder Schriftstärke nicht bestimmbar.", "description": "CSS comparison requires a known text size category." },
+  "cssColorTarget": { "message": "Bewertung des Farbpaars: $value1$", "description": "Explains the conditional numeric color independently of page verification.", "placeholders": { "value1": { "content": "$1" } } },
+  "cssPairSubcount": { "message": "Davon CSS-Farbpaare: $value1$", "description": "Subset of unverified page contrast areas with a CSS-only ratio.", "placeholders": { "value1": { "content": "$1" } } },
+  "filterCSSPairs": { "message": "CSS-Farbpaare", "description": "Shows unverified page areas with a CSS color pair comparison." },
+  "cssColorContrast": {
+    "message": "CSS-Farbkontrast",
+    "description": "A calculated CSS color ratio without a verified page contrast verdict."
+  },
+  "cssColorContrastNotice": {
+    "message": "Aus CSS-Farben berechnet; sichtbare Ebenen und Effekte sind nicht berücksichtigt.",
+    "description": "Distinguishes the CSS sample ratio from verified text contrast."
+  },
+  "reason_layered_background": {
+    "message": "Eine separate Seitenschicht kann den Hintergrund dieses Textes verändern. Die sichtbare Hintergrundfarbe ist nicht sicher bestimmbar.",
+    "description": "Style Inspector Lite: reason_layered_background"
+  },
+  "contrastMinimum": {
+    "message": "Mindestkontrast über den unterstützten Verlauf.",
+    "description": "Style Inspector Lite: contrastMinimum"
+  },
+  "gradientBackground": {
+    "message": "Hintergrundverlauf; keine einheitliche Hintergrundfarbe.",
+    "description": "Style Inspector Lite: gradientBackground"
+  },
+  "reason_gradient_contrast_inconclusive": {
+    "message": "Der Mindestkontrast des Verlaufs reicht für dieses Ziel nicht aus. Der tatsächliche Kontrast hinter dem Text bleibt offen.",
+    "description": "Style Inspector Lite: reason_gradient_contrast_inconclusive"
+  },
+  "noticePrefix": {
+    "message": "Hinweis:",
+    "description": "Bold prefix for the audit explanation."
+  },
+  "manualHelp": {
+    "message": "Eine ungeprüfte Seitendarstellung zählt weder als erfüllt noch als verfehlt. Vorhandene CSS-Farbpaare werden separat mit AA/AAA-Schwellen verglichen; Ebenen und Effekte können das sichtbare Ergebnis verändern.",
+    "description": "Style Inspector Lite: manualHelp"
+  },
+  "auditRuleTotal": {
+    "message": "Geprüfte Textbereiche: $value1$",
+    "description": "Style Inspector Lite: auditRuleTotal",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "auditContrastDescription": {
+    "message": "WCAG-Textkontrast · Ziel $value1$",
+    "description": "Style Inspector Lite: auditContrastDescription",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "auditFontDescription": {
+    "message": "Lesbarkeitsheuristik · 12 CSS-px, kein WCAG-Ergebnis",
+    "description": "Style Inspector Lite: auditFontDescription"
+  },
+  "auditBelowThreshold": {
+    "message": "Unter Prüfschwelle",
+    "description": "Style Inspector Lite: auditBelowThreshold"
+  },
+  "auditActionsActivation": {
+    "message": "Prüfe diese Seite erneut, um ihre Ergebnisse zu aktualisieren und Seitenaktionen zu aktivieren.",
+    "description": "Style Inspector Lite: auditActionsActivation"
+  },
+  "auditActionsRunning": {
+    "message": "Seitenaktionen sind nach Abschluss oder Abbruch dieser Prüfung verfügbar.",
+    "description": "Style Inspector Lite: auditActionsRunning"
+  },
+  "auditActionsExpired": {
+    "message": "Dieser Textbereich ist nicht mehr auf der Seite. Prüfe die Seite erneut, um die Verweise zu aktualisieren.",
+    "description": "Style Inspector Lite: auditActionsExpired"
+  },
+  "actionsDisconnected": {
+    "message": "Seitenaktionen sind während der erneuten Verbindung zur Erweiterung nicht verfügbar.",
+    "description": "Style Inspector Lite: actionsDisconnected"
+  },
+  "statusReconnecting": {
+    "message": "Die Verbindung wurde unterbrochen. Erneute Verbindung zur Erweiterung …",
+    "description": "Style Inspector Lite: statusReconnecting"
+  },
+  "statusReconnectFailed": {
+    "message": "Die Verbindung konnte nicht wiederhergestellt werden. Erneut verbinden, um Seitenaktionen zu aktivieren.",
+    "description": "Style Inspector Lite: statusReconnectFailed"
+  },
+  "actionReconnect": {
+    "message": "Erneut verbinden",
+    "description": "Style Inspector Lite: actionReconnect"
+  },
+  "statusStartingAudit": {
+    "message": "Neue Seitenprüfung wird gestartet …",
+    "description": "Style Inspector Lite: statusStartingAudit"
+  },
+  "auditActivation": {
+    "message": "Wähle „$value1$“, um diese Seite zu prüfen. Firefox fragt gegebenenfalls nach optionalem Zugriff auf HTTP- und HTTPS-Seiten. Damit kannst du neue Seiten prüfen, ohne die Sidebar erneut zu öffnen. Prüfungen starten nur auf deinen Klick.",
+    "description": "Style Inspector Lite: auditActivation",
+    "placeholders": { "value1": { "content": "$1" } }
+  },
+  "statusPagePermission": {
+    "message": "Warten auf die Seitenzugriffsfreigabe von Firefox …",
+    "description": "Style Inspector Lite: statusPagePermission"
+  },
+  "error_page_permission": {
+    "message": "Der Seitenzugriff wurde nicht erlaubt. Du kannst die Prüfung erneut versuchen oder nur diese Seite über den Toolbar-Button aktivieren.",
+    "description": "Style Inspector Lite: error_page_permission"
+  },
+  "error_page_changed": {
+    "message": "Die aktuelle Seite hat gewechselt. Wähle „Erneut prüfen“, um die jetzt angezeigte Seite zu prüfen.",
+    "description": "Style Inspector Lite: error_page_changed"
+  },
+  "actionClose": {
+    "message": "Schließen",
+    "description": "Style Inspector Lite: actionClose"
+  },
+  "clipboardFallback": {
+    "message": "Text manuell kopieren",
+    "description": "Style Inspector Lite: clipboardFallback"
+  },
+  "clipboardFallbackHint": {
+    "message": "Diesen Text markieren und den Kopieren-Befehl des Browsers verwenden.",
+    "description": "Style Inspector Lite: clipboardFallbackHint"
+  },
+  "reason_background_image_or_gradient": {
+    "message": "Ein Hintergrundbild oder Verlauf verhindert den verlässlichen Vergleich einfarbiger Flächen.",
+    "description": "Style Inspector Lite: reason_background_image_or_gradient"
+  },
+  "reason_group_opacity": {
+    "message": "Gruppen-Deckkraft verändert die zusammengesetzten Farben.",
+    "description": "Style Inspector Lite: reason_group_opacity"
+  },
+  "reason_filter": {
+    "message": "Ein CSS-Filter verändert die dargestellten Farben.",
+    "description": "Style Inspector Lite: reason_filter"
+  },
+  "reason_blend_mode": {
+    "message": "Ein Mischmodus verändert die zusammengesetzten Farben.",
+    "description": "Style Inspector Lite: reason_blend_mode"
+  },
+  "reason_text_stroke": {
+    "message": "Eine Textkontur fügt eine weitere dargestellte Farbe hinzu. Prüfen Sie den Textkontrast manuell.",
+    "description": "Style Inspector Lite: reason_text_stroke"
+  },
+  "reason_text_shadow": {
+    "message": "Textschatten verhindern ein verlässliches automatisches Kontrasturteil.",
+    "description": "Style Inspector Lite: reason_text_shadow"
+  },
+  "reason_pseudo_element": {
+    "message": "Ein Pseudoelement kann den dargestellten Hintergrund beeinflussen.",
+    "description": "Style Inspector Lite: reason_pseudo_element"
+  },
+  "reason_overlapping_element": {
+    "message": "Ein überlagerndes Element kann die dargestellten Farben beeinflussen.",
+    "description": "Style Inspector Lite: reason_overlapping_element"
+  },
+  "reason_overlap_sampling_limit": {
+    "message": "Dieser Text umfasst zu viele Teilflächen für eine verlässliche Prüfung auf Überlagerungen.",
+    "description": "Explains the bounded text-fragment overlap check."
+  },
+  "reason_control_text_availability_unknown": {
+    "message": "Der dargestellte Text des Steuerelements ist ohne Lesen privater Werte nicht sicher auswertbar.",
+    "description": "Style Inspector Lite: reason_control_text_availability_unknown"
+  },
+  "reason_svg_text": {
+    "message": "SVG-Text lässt sich mit dieser automatischen Prüfung nicht verlässlich bewerten.",
+    "description": "Style Inspector Lite: reason_svg_text"
+  },
+  "reason_inactive_control": {
+    "message": "Inaktive Steuerelemente sind von dieser Textprüfung ausgenommen.",
+    "description": "Style Inspector Lite: reason_inactive_control"
+  },
+  "reason_selection_text_limit": {
+    "message": "In dieser Auswahl wurde nur die unterstützte Anzahl von Textbereichen erfasst.",
+    "description": "Style Inspector Lite: reason_selection_text_limit"
+  },
+  "reason_transformed_css_size": {
+    "message": "Transformationen können die visuelle Größe verändern; die gemessene Schriftgröße bleibt in CSS-Pixeln.",
+    "description": "Style Inspector Lite: reason_transformed_css_size"
+  },
+  "reason_main_document_only": {
+    "message": "Nur das Hauptdokument wurde geprüft; eingebettete Frames sind ausgeschlossen.",
+    "description": "Style Inspector Lite: reason_main_document_only"
+  },
+  "reason_images_canvas_not_tested": {
+    "message": "Text in Bildern und Canvas wurde nicht geprüft.",
+    "description": "Style Inspector Lite: reason_images_canvas_not_tested"
+  },
+  "reason_shadow_dom_not_tested": {
+    "message": "Inhalte im Shadow DOM wurden nicht geprüft.",
+    "description": "Style Inspector Lite: reason_shadow_dom_not_tested"
+  },
+  "reason_dynamic_content_snapshot": {
+    "message": "Ergebnisse beschreiben den Messzustand; spätere dynamische Änderungen werden nicht automatisch geprüft.",
+    "description": "Style Inspector Lite: reason_dynamic_content_snapshot"
+  },
+  "reason_scan_limit": {
+    "message": "Das Sicherheitslimit wurde erreicht; dies ist ein Teilscan.",
+    "description": "Style Inspector Lite: reason_scan_limit"
+  },
+  "reason_document_changed_during_scan": {
+    "message": "Das Dokument änderte sich während der Prüfung; Ergebnisse können veraltet sein.",
+    "description": "Style Inspector Lite: reason_document_changed_during_scan"
+  },
+  "reason_measurement_failed": {
+    "message": "Einige Messungen konnten nicht abgeschlossen werden.",
+    "description": "Style Inspector Lite: reason_measurement_failed"
+  },
+  "reason_unsupported_color": {
+    "message": "Diese Farbe liegt außerhalb des unterstützten sRGB-Formats.",
+    "description": "Measurement limitation: unsupported_color"
+  },
+  "reason_unresolved_background": {
+    "message": "Der effektive Hintergrund konnte nicht verlässlich bestimmt werden.",
+    "description": "Measurement limitation: unresolved_background"
+  },
+  "reason_unknown_text_size": {
+    "message": "Schriftgröße oder Schriftgewicht konnten nicht bestimmt werden.",
+    "description": "Measurement limitation: unknown_text_size"
+  },
+  "reason_unknown_font_size": {
+    "message": "Die Schriftgröße konnte nicht verlässlich gemessen werden.",
+    "description": "Measurement limitation: unknown_font_size"
+  },
+  "reason_stale_measurement": {
+    "message": "Diese Messung gehört zu einem vorherigen Zustand.",
+    "description": "Measurement limitation: stale_measurement"
+  },
+  "reason_different_text_run": {
+    "message": "Diese Empfehlung gehört zu einem anderen Textbereich.",
+    "description": "Measurement limitation: different_text_run"
+  },
+  "reason_already_passes": {
+    "message": "Das gewählte Kontrastziel ist bereits erfüllt.",
+    "description": "Measurement limitation: already_passes"
+  },
+  "reason_unsupported_suggestion": {
+    "message": "Diese Farbkombination ist für eine automatische Empfehlung nicht verlässlich genug.",
+    "description": "Measurement limitation: unsupported_suggestion"
+  },
+  "reason_inherited_background": {
+    "message": "Der effektive Hintergrund stammt von einem anderen Element.",
+    "description": "Measurement limitation: inherited_background"
+  },
+  "reason_target_unreachable": {
+    "message": "Das gewählte Ziel ist bei unveränderter Gegenfarbe nicht erreichbar.",
+    "description": "Measurement limitation: target_unreachable"
+  },
+  "reason_same_text_run": {
+    "message": "Nur für den gemessenen Textbereich gültig.",
+    "description": "Measurement limitation: same_text_run"
+  },
+  "reason_same_font_size_and_weight": {
+    "message": "Schriftgröße und Schriftgewicht müssen unverändert bleiben.",
+    "description": "Measurement limitation: same_font_size_and_weight"
+  },
+  "reason_unchanged_background": {
+    "message": "Der Hintergrund muss unverändert bleiben.",
+    "description": "Measurement limitation: unchanged_background"
+  },
+  "reason_unchanged_foreground": {
+    "message": "Die Textfarbe muss unverändert bleiben.",
+    "description": "Measurement limitation: unchanged_foreground"
+  },
+  "reason_current_measurement_only": {
+    "message": "Nur für diese Messung gültig.",
+    "description": "Measurement limitation: current_measurement_only"
+  },
+  "reason_precise_color_fallback": {
+    "message": "Ein präziser RGB-Wert erhält die gemessene Farbe.",
+    "description": "Measurement limitation: precise_color_fallback"
+  },
+  "reason_unsupported_value": {
+    "message": "Dieser Wert kann nicht sicher exportiert werden.",
+    "description": "Measurement limitation: unsupported_value"
+  },
+  "reason_unsupported_property": {
+    "message": "Diese Eigenschaft wird beim Export nicht unterstützt.",
+    "description": "Measurement limitation: unsupported_property"
+  },
+  "reason_unsupported_palette_color": {
+    "message": "Eine Palettenfarbe wird in diesem Format nicht unterstützt.",
+    "description": "Measurement limitation: unsupported_palette_color"
+  },
+  "reason_unsupported_font_family": {
+    "message": "Dieser font-family-Wert kann nicht sicher exportiert werden.",
+    "description": "Measurement limitation: unsupported_font_family"
+  },
+  "reason_partial_scan": {
+    "message": "Die Prüfung hat nur einen Teil des Dokuments erfasst.",
+    "description": "Measurement limitation: partial_scan"
+  },
+  "reason_unsupported_tailwind_value": {
+    "message": "Dieser Wert lässt sich nicht sicher in Tailwind CSS v4 darstellen.",
+    "description": "Measurement limitation: unsupported_tailwind_value"
+  },
+  "error_measurement_failed": {
+    "message": "Das Element konnte nicht gemessen werden. Erneut auswählen.",
+    "description": "Runtime error: measurement_failed"
+  },
+  "error_settings_failed": {
+    "message": "Die Vorgaben konnten nicht gespeichert werden. Bitte erneut versuchen.",
+    "description": "Runtime error: settings_failed"
+  },
+  "error_sidebar_open_failed": {
+    "message": "Firefox konnte die Inspector-Sidebar nicht öffnen.",
+    "description": "Runtime error: sidebar_open_failed"
+  },
+  "error_operation_failed": {
+    "message": "Die angeforderte Aktion ist fehlgeschlagen. Bitte erneut versuchen.",
+    "description": "Runtime error: operation_failed"
+  },
+  "extensionName": {
+    "message": "Style Inspector Lite",
+    "description": "Style Inspector Lite: extensionName"
+  },
+  "extensionDescription": {
+    "message": "Styles untersuchen, Textkontrast und kleine Schrift prüfen und gemessene CSS-Werte lokal in der Firefox-Sidebar exportieren.",
+    "description": "Style Inspector Lite: extensionDescription"
+  },
+  "commandOpen": {
+    "message": "Style Inspector Lite öffnen",
+    "description": "Style Inspector Lite: commandOpen"
+  },
+  "contextInspect": {
+    "message": "Mit Style Inspector untersuchen",
+    "description": "Style Inspector Lite: contextInspect"
+  },
+  "pickerHint": {
+    "message": "Klicken zum Auswählen · Esc zum Abbrechen",
+    "description": "Style Inspector Lite: pickerHint"
+  },
+  "tabAudit": {
+    "message": "Seiten-Audit",
+    "description": "Style Inspector Lite: tabAudit"
+  },
+  "tabAuditShort": {
+    "message": "Audit",
+    "description": "Style Inspector Lite: tabAuditShort"
+  },
+  "tabContrast": {
+    "message": "Kontrast",
+    "description": "Style Inspector Lite: tabContrast"
+  },
+  "tabColors": {
+    "message": "Farben",
+    "description": "Style Inspector Lite: tabColors"
+  },
+  "tabTypography": {
+    "message": "Typografie",
+    "description": "Style Inspector Lite: tabTypography"
+  },
+  "tabLayout": {
+    "message": "Layout",
+    "description": "Style Inspector Lite: tabLayout"
+  },
+  "navigation": {
+    "message": "Inspector-Ansichten",
+    "description": "Style Inspector Lite: navigation"
+  },
+  "actionSelectElement": {
+    "message": "Element wählen",
+    "description": "Style Inspector Lite: actionSelectElement"
+  },
+  "actionStopSelecting": {
+    "message": "Auswahl beenden",
+    "description": "Style Inspector Lite: actionStopSelecting"
+  },
+  "actionScanPage": {
+    "message": "Seite prüfen",
+    "description": "Style Inspector Lite: actionScanPage"
+  },
+  "actionRescan": {
+    "message": "Erneut prüfen",
+    "description": "Style Inspector Lite: actionRescan"
+  },
+  "actionCancelScan": {
+    "message": "Prüfung abbrechen",
+    "description": "Style Inspector Lite: actionCancelScan"
+  },
+  "actionCopy": {
+    "message": "Kopieren",
+    "description": "Style Inspector Lite: actionCopy"
+  },
+  "actionExport": {
+    "message": "Exportieren …",
+    "description": "Style Inspector Lite: actionExport"
+  },
+  "actionSave": {
+    "message": "Datei speichern",
+    "description": "Style Inspector Lite: actionSave"
+  },
+  "actionBack": {
+    "message": "Zurück",
+    "description": "Style Inspector Lite: actionBack"
+  },
+  "actionSettings": {
+    "message": "Einstellungen",
+    "description": "Style Inspector Lite: actionSettings"
+  },
+  "actionRefresh": {
+    "message": "Erneut messen",
+    "description": "Style Inspector Lite: actionRefresh"
+  },
+  "actionInspect": {
+    "message": "Untersuchen",
+    "description": "Style Inspector Lite: actionInspect"
+  },
+  "actionShow": {
+    "message": "Auf Seite zeigen",
+    "description": "Style Inspector Lite: actionShow"
+  },
+  "actionShowHint": {
+    "message": "Zu $value1$ scrollen und das Element auf der Seite hervorheben.",
+    "description": "Explains which audit element will be highlighted",
+    "placeholders": { "value1": { "content": "$1" } }
+  },
+  "highlightHint": {
+    "message": "Markiert: $value1$ · Esc zum Ausblenden",
+    "description": "Label next to the highlighted page element; contains only its selector",
+    "placeholders": { "value1": { "content": "$1" } }
+  },
+  "actionTypography": {
+    "message": "Typografie ansehen",
+    "description": "Style Inspector Lite: actionTypography"
+  },
+  "actionReturnAudit": {
+    "message": "Zurück zum Audit",
+    "description": "Style Inspector Lite: actionReturnAudit"
+  },
+  "actionMore": {
+    "message": "Mehr anzeigen ($value1$ verbleibend)",
+    "description": "Style Inspector Lite: actionMore",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "actionCopyValue": {
+    "message": "$value1$ kopieren",
+    "description": "Style Inspector Lite: actionCopyValue",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "actionCopyColor": {
+    "message": "Farbe kopieren",
+    "description": "Style Inspector Lite: actionCopyColor"
+  },
+  "actionExportSuggestion": {
+    "message": "Vorschlag exportieren …",
+    "description": "Style Inspector Lite: actionExportSuggestion"
+  },
+  "actionSuggestions": {
+    "message": "Vorschläge ansehen",
+    "description": "Style Inspector Lite: actionSuggestions"
+  },
+  "actionCancel": {
+    "message": "Abbrechen",
+    "description": "Style Inspector Lite: actionCancel"
+  },
+  "actionConfirm": {
+    "message": "Bestätigen",
+    "description": "Style Inspector Lite: actionConfirm"
+  },
+  "actionCopyClasses": {
+    "message": "Nur Klassen kopieren",
+    "description": "Style Inspector Lite: actionCopyClasses"
+  },
+  "statusSelected": {
+    "message": "Ausgewählt",
+    "description": "Style Inspector Lite: statusSelected"
+  },
+  "statusPreview": {
+    "message": "Vorschau – auf der Seite klicken zum Bestätigen",
+    "description": "Style Inspector Lite: statusPreview"
+  },
+  "statusPass": {
+    "message": "Erfüllt",
+    "description": "Style Inspector Lite: statusPass"
+  },
+  "statusFail": {
+    "message": "Nicht erfüllt",
+    "description": "Style Inspector Lite: statusFail"
+  },
+  "statusManualReview": {
+    "message": "Nicht bewertbar",
+    "description": "Style Inspector Lite: statusManualReview"
+  },
+  "statusNotApplicable": {
+    "message": "Nicht anwendbar",
+    "description": "Style Inspector Lite: statusNotApplicable"
+  },
+  "statusThresholdMet": {
+    "message": "Prüfschwelle eingehalten",
+    "description": "Style Inspector Lite: statusThresholdMet"
+  },
+  "statusCopied": {
+    "message": "Kopiert",
+    "description": "Style Inspector Lite: statusCopied"
+  },
+  "statusCopyFailed": {
+    "message": "Kopieren fehlgeschlagen. Bitte Zwischenablagezugriff prüfen.",
+    "description": "Style Inspector Lite: statusCopyFailed"
+  },
+  "statusConnecting": {
+    "message": "Verbindung zur aktuellen Seite …",
+    "description": "Style Inspector Lite: statusConnecting"
+  },
+  "statusScanning": {
+    "message": "Prüfe $value1$ von $value2$ Textbereichen …",
+    "description": "Style Inspector Lite: statusScanning",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusPartial": {
+    "message": "Teilscan",
+    "description": "Style Inspector Lite: statusPartial"
+  },
+  "statusCancelled": {
+    "message": "Prüfung abgebrochen",
+    "description": "Style Inspector Lite: statusCancelled"
+  },
+  "statusComplete": {
+    "message": "Prüfung abgeschlossen",
+    "description": "Style Inspector Lite: statusComplete"
+  },
+  "statusStale": {
+    "message": "Für eine vorherige Ansicht geprüft. Für aktuelle Ergebnisse erneut messen.",
+    "description": "Style Inspector Lite: statusStale"
+  },
+  "statusStartedDownload": {
+    "message": "Speicherdialog geöffnet. Die Datei ist noch nicht als gespeichert bestätigt.",
+    "description": "Style Inspector Lite: statusStartedDownload"
+  },
+  "statusSaved": {
+    "message": "Datei gespeichert",
+    "description": "Style Inspector Lite: statusSaved"
+  },
+  "statusSaveCancelled": {
+    "message": "Dateispeicherung abgebrochen",
+    "description": "Style Inspector Lite: statusSaveCancelled"
+  },
+  "statusReset": {
+    "message": "Einstellungen zurückgesetzt",
+    "description": "Style Inspector Lite: statusReset"
+  },
+  "statusCleared": {
+    "message": "Analysedaten gelöscht",
+    "description": "Style Inspector Lite: statusCleared"
+  },
+  "emptyAuditTitle": {
+    "message": "Diese Seite genauer ansehen",
+    "description": "Style Inspector Lite: emptyAuditTitle"
+  },
+  "emptyAudit": {
+    "message": "Textkontrast und Schrift unter 12 CSS-px prüfen. Die Prüfung startet erst mit „Seite prüfen“.",
+    "description": "Style Inspector Lite: emptyAudit"
+  },
+  "emptyAuditHint": {
+    "message": "Noch nicht geprüft",
+    "description": "Style Inspector Lite: emptyAuditHint"
+  },
+  "emptySelectionTitle": {
+    "message": "Noch kein Element ausgewählt",
+    "description": "Style Inspector Lite: emptySelectionTitle"
+  },
+  "emptySelection": {
+    "message": "Nutze „Element wählen“ oder den Rechtsklick auf ein Element auf der Seite.",
+    "description": "Style Inspector Lite: emptySelection"
+  },
+  "activation": {
+    "message": "Prüfe die aktuelle Seite im Seiten-Audit, um sie zu aktivieren, oder verwende den Toolbar-Button von Style Inspector Lite oder dessen Kontextmenü.",
+    "description": "Style Inspector Lite: activation"
+  },
+  "activationToolbar": {
+    "message": "Prüfe die aktuelle Seite im Seiten-Audit, um sie zu aktivieren, oder verwende den Toolbar-Button von Style Inspector Lite.",
+    "description": "Style Inspector Lite: activationToolbar"
+  },
+  "unsupported": {
+    "message": "Firefox schützt diese Seite vor Erweiterungen. Öffne eine normale HTTP- oder HTTPS-Seite.",
+    "description": "Style Inspector Lite: unsupported"
+  },
+  "contrastIssues": {
+    "message": "Kontrastfehler",
+    "description": "Style Inspector Lite: contrastIssues"
+  },
+  "readabilityHints": {
+    "message": "Lesbarkeitshinweise",
+    "description": "Style Inspector Lite: readabilityHints"
+  },
+  "findingSmallText": {
+    "message": "Kleine Schrift – Lesbarkeitshinweis",
+    "description": "Style Inspector Lite: findingSmallText"
+  },
+  "manualCount": {
+    "message": "$value1$ automatisch nicht bewertbar",
+    "description": "Style Inspector Lite: manualCount",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "contrastTarget": {
+    "message": "Kontrast-Zielstufe",
+    "description": "Style Inspector Lite: contrastTarget"
+  },
+  "textContrast": {
+    "message": "Textkontrast",
+    "description": "Style Inspector Lite: textContrast"
+  },
+  "fontSize": {
+    "message": "Schriftgröße",
+    "description": "Style Inspector Lite: fontSize"
+  },
+  "scope": {
+    "message": "Prüfumfang",
+    "description": "Style Inspector Lite: scope"
+  },
+  "scanned": {
+    "message": "Geprüfte Textbereiche",
+    "description": "Style Inspector Lite: scanned"
+  },
+  "skipped": {
+    "message": "Ausgelassene Bereiche",
+    "description": "Style Inspector Lite: skipped"
+  },
+  "total": {
+    "message": "Bekannte Textbereiche",
+    "description": "Style Inspector Lite: total"
+  },
+  "checks": {
+    "message": "Regelprüfungen",
+    "description": "Style Inspector Lite: checks"
+  },
+  "findings": {
+    "message": "Befunde",
+    "description": "Style Inspector Lite: findings"
+  },
+  "affected": {
+    "message": "Betroffene Textbereiche",
+    "description": "Style Inspector Lite: affected"
+  },
+  "viewport": {
+    "message": "Seiten-Viewport (CSS-px)",
+    "description": "Style Inspector Lite: viewport"
+  },
+  "measuredAt": {
+    "message": "Gemessen",
+    "description": "Style Inspector Lite: measuredAt"
+  },
+  "all": {
+    "message": "Alle",
+    "description": "Style Inspector Lite: all"
+  },
+  "filterContrast": {
+    "message": "Kontrastprobleme",
+    "description": "Style Inspector Lite: filterContrast"
+  },
+  "filterSmall": {
+    "message": "Kleine Schrift",
+    "description": "Style Inspector Lite: filterSmall"
+  },
+  "filterManual": {
+    "message": "Keine Messwerte",
+    "description": "Audit filter for text contrast without a measured ratio or a CSS color-pair ratio."
+  },
+  "noFindings": {
+    "message": "Keine Textbereiche entsprechen diesem Filter.",
+    "description": "Style Inspector Lite: noFindings"
+  },
+  "threshold": {
+    "message": "Grenzwert: $value1$",
+    "description": "Style Inspector Lite: threshold",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "ratio": {
+    "message": "Kontrastverhältnis",
+    "description": "Style Inspector Lite: ratio"
+  },
+  "ratioUnavailable": {
+    "message": "Kein Messwert",
+    "description": "Shown instead of a numeric contrast ratio when no reliable measurement exists."
+  },
+  "placeholderText": {
+    "message": "Platzhaltertext",
+    "description": "Labels a contrast measurement of the visible input placeholder."
+  },
+  "placeholderSuggestionsUnavailable": {
+    "message": "Kontrastvorschläge für Platzhaltertexte werden noch nicht unterstützt.",
+    "description": "Explains why a placeholder contrast failure has no automatic color suggestions."
+  },
+  "contrastValueTarget": {
+    "message": "Bewertung für $value1$",
+    "description": "Explains which WCAG target determines the contrast value color",
+    "placeholders": { "value1": { "content": "$1" } }
+  },
+  "targetMet": {
+    "message": "Erfüllt $value1$ für dieses geprüfte Farbpaar",
+    "description": "Style Inspector Lite: targetMet",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "normalText": {
+    "message": "Normaler Text",
+    "description": "Style Inspector Lite: normalText"
+  },
+  "largeText": {
+    "message": "Großer Text",
+    "description": "Style Inspector Lite: largeText"
+  },
+  "unknownText": {
+    "message": "Textkategorie unbekannt",
+    "description": "Style Inspector Lite: unknownText"
+  },
+  "noText": {
+    "message": "Kein auswertbarer sichtbarer Text in diesem Element. Symbole und Bildinhalte werden nicht als Textkontrast geprüft.",
+    "description": "Style Inspector Lite: noText"
+  },
+  "textAreas": {
+    "message": "Textbereich $value1$ von $value2$",
+    "description": "Style Inspector Lite: textAreas",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      }
+    }
+  },
+  "mixedText": {
+    "message": "Dieses Element enthält $value1$ Textbereiche. Ergebnisse gelten für den gewählten Bereich.",
+    "description": "Style Inspector Lite: mixedText",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "fontWarning": {
+    "message": "$value1$ CSS-px – unter 12 px",
+    "description": "Style Inspector Lite: fontWarning",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "fontRecommendation": {
+    "message": "Schriftgröße im Kontext prüfen; mindestens unsere Prüfschwelle von 12 CSS-px erwägen. Für längere Texte kann mehr sinnvoll sein.",
+    "description": "Style Inspector Lite: fontRecommendation"
+  },
+  "fontHeuristic": {
+    "message": "Die 12-px-Schwelle ist eine Lesbarkeitsheuristik, kein WCAG-Mindestwert und keine Barrierefreiheitsgarantie.",
+    "description": "Style Inspector Lite: fontHeuristic"
+  },
+  "fontUnknown": {
+    "message": "Schriftgröße konnte nicht verlässlich gemessen werden.",
+    "description": "Style Inspector Lite: fontUnknown"
+  },
+  "previewColor": {
+    "message": "Farbvorschau",
+    "description": "Style Inspector Lite: previewColor"
+  },
+  "previewCSS": {
+    "message": "CSS-Farbmuster",
+    "description": "Color sample title when CSS colors cannot establish the actual contrast."
+  },
+  "previewCSSNotice": {
+    "message": "Nur CSS-Farben werden gezeigt. Überlagerungen und Effekte der Webseite fehlen.",
+    "description": "Explains why an apparently readable sample does not resolve uncertain page contrast."
+  },
+  "previewCSSBackground": {
+    "message": "Hintergrund aus CSS",
+    "description": "Background label for an unverified CSS color sample."
+  },
+  "previewUnavailable": {
+    "message": "Keine verlässliche Farbvorschau möglich: Textfarbe oder Hintergrund sind nicht eindeutig bestimmt.",
+    "description": "Replaces a sample when its color pair cannot be established."
+  },
+  "previewText": {
+    "message": "Beispieltext",
+    "description": "Style Inspector Lite: previewText"
+  },
+  "previewFont": {
+    "message": "Schriftvorschau",
+    "description": "Style Inspector Lite: previewFont"
+  },
+  "previewFontText": {
+    "message": "Aa – Beispieltext 0123",
+    "description": "Style Inspector Lite: previewFontText"
+  },
+  "fontFallback": {
+    "message": "CSS-Schriftfamilien bestimmen nicht sicher die tatsächlich gerenderte Schrift. Webseiten-Webfonts können hier fehlen; eine lokale Ersatzschrift wird verwendet.",
+    "description": "Style Inspector Lite: fontFallback"
+  },
+  "foreground": {
+    "message": "Textfarbe",
+    "description": "Style Inspector Lite: foreground"
+  },
+  "background": {
+    "message": "CSS-Hintergrund",
+    "description": "Style Inspector Lite: background"
+  },
+  "effectiveBackground": {
+    "message": "Effektiver Hintergrund",
+    "description": "Style Inspector Lite: effectiveBackground"
+  },
+  "borderColor": {
+    "message": "Rahmenfarbe",
+    "description": "Style Inspector Lite: borderColor"
+  },
+  "unknownColor": {
+    "message": "Nicht unterstützte oder unklare Farbe",
+    "description": "Style Inspector Lite: unknownColor"
+  },
+  "alphaNote": {
+    "message": "HEX-Anzeige und einzeln kopierte Farben werden gerundet, einschließlich Alpha. Messwerte und Code-Exporte behalten ihre Genauigkeit.",
+    "description": "Style Inspector Lite: alphaNote"
+  },
+  "colorRoundedHex": {
+    "message": "Gerundeter HEX-Wert; genauer Wert: $value1$",
+    "description": "Tooltip for a color label rounded to eight-bit HEX channels.",
+    "placeholders": { "value1": { "content": "$1" } }
+  },
+  "pagePalette": {
+    "message": "Seitenpalette",
+    "description": "Style Inspector Lite: pagePalette"
+  },
+  "pageFonts": {
+    "message": "Erfasste CSS-Schriftfamilien",
+    "description": "Style Inspector Lite: pageFonts"
+  },
+  "pageOverview": {
+    "message": "Seitenübersicht",
+    "description": "Separates audit-wide colors and fonts from the selected element."
+  },
+  "pageValuesScope": {
+    "message": "Farben und CSS-Schriftfamilien der im Audit gemessenen Textbereiche. Nicht erfasste Inhalte sind nicht enthalten.",
+    "description": "Scope of the page overview, not a claim to cover every page style."
+  },
+  "pageFontsHelp": {
+    "message": "Jeder Eintrag ist eine berechnete CSS-Schriftfamilienliste mit Ersatzschriften. Welche Schrift den Text tatsächlich darstellt, wird damit nicht bestimmt.",
+    "description": "Explains why CSS font stacks are not a list of verified rendered font faces."
+  },
+  "noPageValues": {
+    "message": "Bei dieser Prüfung wurden keine Werte erfasst.",
+    "description": "Empty palette or font overview after a scan."
+  },
+  "copyPageValues": {
+    "message": "Seitenfarben und CSS-Schriftfamilien als CSS kopieren",
+    "description": "Footer action in a page overview without an element selection."
+  },
+  "noPalette": {
+    "message": "Prüfe die Seite, um ihre Palette und CSS-Schriftfamilien zu erfassen.",
+    "description": "Style Inspector Lite: noPalette"
+  },
+  "generatedNames": {
+    "message": "Exportnamen werden vom Inspector erzeugt und sind keine ursprünglichen Design-Tokens.",
+    "description": "Style Inspector Lite: generatedNames"
+  },
+  "cssDimensions": {
+    "message": "Aufgelöste CSS-Größen",
+    "description": "Style Inspector Lite: cssDimensions"
+  },
+  "visualDimensions": {
+    "message": "Visuelle Grenzen: $value1$ × $value2$ CSS-px",
+    "description": "Style Inspector Lite: visualDimensions",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      }
+    }
+  },
+  "visualNote": {
+    "message": "Visuelle Grenzen enthalten Transformationen. Sie sind nicht die CSS-Content-Box.",
+    "description": "Style Inspector Lite: visualNote"
+  },
+  "contentBox": {
+    "message": "Inhalt",
+    "description": "Style Inspector Lite: contentBox"
+  },
+  "suggestions": {
+    "message": "Verbesserungsvorschläge",
+    "description": "Style Inspector Lite: suggestions"
+  },
+  "suggestionIntro": {
+    "message": "Nur Empfehlungen. Seite und ursprüngliche Ergebnisse bleiben unverändert.",
+    "description": "Style Inspector Lite: suggestionIntro"
+  },
+  "changeText": {
+    "message": "Textfarbe anpassen",
+    "description": "Style Inspector Lite: changeText"
+  },
+  "changeBackground": {
+    "message": "Hintergrund anpassen",
+    "description": "Style Inspector Lite: changeBackground"
+  },
+  "backgroundUnavailable": {
+    "message": "Ein Hintergrundvorschlag benötigt einen eigenen deckenden Hintergrund dieses Elements.",
+    "description": "Style Inspector Lite: backgroundUnavailable"
+  },
+  "pagePaletteOption": {
+    "message": "Vorhandene Seitenfarben einbeziehen",
+    "description": "Style Inspector Lite: pagePaletteOption"
+  },
+  "paletteSource": {
+    "message": "Aus Seitenpalette",
+    "description": "Style Inspector Lite: paletteSource"
+  },
+  "before": {
+    "message": "Vorher",
+    "description": "Style Inspector Lite: before"
+  },
+  "suggestion": {
+    "message": "Vorschlag",
+    "description": "Style Inspector Lite: suggestion"
+  },
+  "noSuggestion": {
+    "message": "Keine verlässliche Farbempfehlung für diese Kombination möglich.",
+    "description": "Style Inspector Lite: noSuggestion"
+  },
+  "noCandidate": {
+    "message": "Kein passender Vorschlag bei unveränderter Gegenfarbe gefunden.",
+    "description": "Style Inspector Lite: noCandidate"
+  },
+  "suggestionScope": {
+    "message": "Gilt nur für diesen Textbereich bei unveränderter Gegenfarbe und Schriftgeometrie. Andere Zustände und abhängige Elemente separat prüfen.",
+    "description": "Style Inspector Lite: suggestionScope"
+  },
+  "suggestionTextFillReset": {
+    "message": "Die exportierte Korrektur setzt auch die Textfüllfarbe auf die Textfarbe zurück.",
+    "description": "Style Inspector Lite: suggestionTextFillReset"
+  },
+  "simulation": {
+    "message": "Farbsehschwächen simulieren",
+    "description": "Style Inspector Lite: simulation"
+  },
+  "simulationMode": {
+    "message": "Vergleichsmodus",
+    "description": "Style Inspector Lite: simulationMode"
+  },
+  "modeOriginal": {
+    "message": "Original",
+    "description": "Style Inspector Lite: modeOriginal"
+  },
+  "modeProtanopia": {
+    "message": "Protanopie",
+    "description": "Style Inspector Lite: modeProtanopia"
+  },
+  "modeDeuteranopia": {
+    "message": "Deuteranopie",
+    "description": "Style Inspector Lite: modeDeuteranopia"
+  },
+  "modeTritanopia": {
+    "message": "Tritanopie",
+    "description": "Style Inspector Lite: modeTritanopia"
+  },
+  "modeGrayscale": {
+    "message": "Graustufen",
+    "description": "Style Inspector Lite: modeGrayscale"
+  },
+  "originalMeasurement": {
+    "message": "Originalmessung",
+    "description": "Style Inspector Lite: originalMeasurement"
+  },
+  "simulatedPreview": {
+    "message": "Simulierte Vorschau",
+    "description": "Style Inspector Lite: simulatedPreview"
+  },
+  "simulationNotice": {
+    "message": "Annäherung an verändertes Farbsehen. Keine vollständige Barrierefreiheitsprüfung. Originalmessungen und Kontrastergebnisse bleiben unverändert.",
+    "description": "Style Inspector Lite: simulationNotice"
+  },
+  "simulationProtanopia": {
+    "message": "Verminderte Rotempfindlichkeit; Machado-Modell (2009) mit fester Stärke.",
+    "description": "Style Inspector Lite: simulationProtanopia"
+  },
+  "simulationDeuteranopia": {
+    "message": "Verminderte Grünempfindlichkeit; Machado-Modell (2009) mit fester Stärke.",
+    "description": "Style Inspector Lite: simulationDeuteranopia"
+  },
+  "simulationTritanopia": {
+    "message": "Verminderte Blauempfindlichkeit; Machado-Modell (2009) mit fester Stärke.",
+    "description": "Style Inspector Lite: simulationTritanopia"
+  },
+  "simulationGrayscale": {
+    "message": "Luminanzbasierter Graustufenvergleich; keine medizinische Simulation einer Achromatopsie.",
+    "description": "Style Inspector Lite: simulationGrayscale"
+  },
+  "simulationOriginal": {
+    "message": "Unveränderte gemessene Farben.",
+    "description": "Style Inspector Lite: simulationOriginal"
+  },
+  "useOfColor": {
+    "message": "Information nicht allein über Farbe vermitteln; Beschriftungen, Symbole oder Muster können zusätzlich nötig sein.",
+    "description": "Style Inspector Lite: useOfColor"
+  },
+  "appearance": {
+    "message": "Farbschema",
+    "description": "Style Inspector Lite: appearance"
+  },
+  "appearanceSystem": {
+    "message": "Automatisch",
+    "description": "Style Inspector Lite: appearanceSystem"
+  },
+  "appearanceLight": {
+    "message": "Hell",
+    "description": "Style Inspector Lite: appearanceLight"
+  },
+  "appearanceDark": {
+    "message": "Dunkel",
+    "description": "Style Inspector Lite: appearanceDark"
+  },
+  "colorFormat": {
+    "message": "Bevorzugtes Farbformat",
+    "description": "Style Inspector Lite: colorFormat"
+  },
+  "livePreview": {
+    "message": "Live-Vorschau bei der Elementauswahl",
+    "description": "Style Inspector Lite: livePreview"
+  },
+  "livePreviewDescription": {
+    "message": "Während der Elementauswahl Werte beim Überfahren aktualisieren.",
+    "description": "Style Inspector Lite: livePreviewDescription"
+  },
+  "contextMenuEnabled": {
+    "message": "Kontextmenüeintrag anzeigen",
+    "description": "Style Inspector Lite: contextMenuEnabled"
+  },
+  "contextMenuDescription": {
+    "message": "Ein Element direkt über einen Rechtsklick untersuchen.",
+    "description": "Style Inspector Lite: contextMenuDescription"
+  },
+  "dataManagement": {
+    "message": "Datenverwaltung",
+    "description": "Style Inspector Lite: dataManagement"
+  },
+  "clearData": {
+    "message": "Analysedaten löschen",
+    "description": "Style Inspector Lite: clearData"
+  },
+  "clearDataDescription": {
+    "message": "Auswahlen und Prüfungen in allen offenen Inspector-Sidebars löschen. Einstellungen, gespeicherte Dateien und Zwischenablage bleiben erhalten.",
+    "description": "Style Inspector Lite: clearDataDescription"
+  },
+  "resetSettings": {
+    "message": "Einstellungen zurücksetzen",
+    "description": "Style Inspector Lite: resetSettings"
+  },
+  "resetSettingsDescription": {
+    "message": "Diese fünf Vorgaben zurücksetzen. Analysedaten, Firefox-Tastenkürzel und erteilte Berechtigungen bleiben erhalten.",
+    "description": "Style Inspector Lite: resetSettingsDescription"
+  },
+  "confirmClear": {
+    "message": "Alle temporären Analysedaten löschen?",
+    "description": "Style Inspector Lite: confirmClear"
+  },
+  "confirmReset": {
+    "message": "Die fünf Vorgaben zurücksetzen?",
+    "description": "Style Inspector Lite: confirmReset"
+  },
+  "shortcut": {
+    "message": "Tastenkürzel",
+    "description": "Style Inspector Lite: shortcut"
+  },
+  "unassigned": {
+    "message": "Nicht zugewiesen",
+    "description": "Style Inspector Lite: unassigned"
+  },
+  "shortcutHelp": {
+    "message": "Firefox-Add-ons-Verwaltung → Zahnrad → Tastenkombinationen von Erweiterungen verwalten.",
+    "description": "Style Inspector Lite: shortcutHelp"
+  },
+  "about": {
+    "message": "Über Style Inspector Lite",
+    "description": "Style Inspector Lite: about"
+  },
+  "version": {
+    "message": "Version $value1$",
+    "description": "Style Inspector Lite: version",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "privacy": {
+    "message": "Analysen bleiben in dieser Browsersitzung. Nur Vorgaben werden dauerhaft gespeichert. Exportdateien werden nur auf Anfrage gespeichert. Kein Tracking, keine Konten oder externen Dienste.",
+    "description": "Style Inspector Lite: privacy"
+  },
+  "limitations": {
+    "message": "Prüfungen erfassen unterstützten Text im Hauptdokument. Frames, geschlossene Shadow Roots, Bilder, Canvas und komplexe Farbkompositionen können ausgelassen werden oder manuelle Prüfung erfordern. Dies ist keine vollständige Barrierefreiheitsprüfung.",
+    "description": "Style Inspector Lite: limitations"
+  },
+  "exportTitle": {
+    "message": "Gemessene Styles exportieren",
+    "description": "Style Inspector Lite: exportTitle"
+  },
+  "exportSource": {
+    "message": "Datenquelle",
+    "description": "Style Inspector Lite: exportSource"
+  },
+  "sourceElement": {
+    "message": "Aktuelles Element",
+    "description": "Style Inspector Lite: sourceElement"
+  },
+  "sourceTokens": {
+    "message": "Seitenwerte (Farben & Schriften)",
+    "description": "Style Inspector Lite: sourceTokens"
+  },
+  "sourceAudit": {
+    "message": "Audit-Bericht",
+    "description": "Style Inspector Lite: sourceAudit"
+  },
+  "sourceSuggestion": {
+    "message": "Kontrastvorschlag (nicht angewendet)",
+    "description": "Style Inspector Lite: sourceSuggestion"
+  },
+  "exportScope": {
+    "message": "Elementumfang",
+    "description": "Style Inspector Lite: exportScope"
+  },
+  "scopeAll": {
+    "message": "Alle erfassten Style-Gruppen",
+    "description": "Style Inspector Lite: scopeAll"
+  },
+  "scopeColors": {
+    "message": "Nur Farben",
+    "description": "Style Inspector Lite: scopeColors"
+  },
+  "scopeTypography": {
+    "message": "Nur Typografie",
+    "description": "Style Inspector Lite: scopeTypography"
+  },
+  "scopeLayout": {
+    "message": "Nur Layout",
+    "description": "Style Inspector Lite: scopeLayout"
+  },
+  "scopeSuggestion": {
+    "message": "Nur vorgeschlagene Korrektur",
+    "description": "Style Inspector Lite: scopeSuggestion"
+  },
+  "exportFormat": {
+    "message": "Format",
+    "description": "Style Inspector Lite: exportFormat"
+  },
+  "exportPreview": {
+    "message": "Exakte Dateivorschau",
+    "description": "Style Inspector Lite: exportPreview"
+  },
+  "exportGenerated": {
+    "message": "Aus gemessenen Styles erzeugt. Enthält nur unterstützte Eigenschaften des gemessenen Zustands.",
+    "description": "Style Inspector Lite: exportGenerated"
+  },
+  "exportAuditOnly": {
+    "message": "Audit-Berichte lassen sich als JSON speichern. Für einen lesbaren Bericht „Kopieren“ in der Audit-Ansicht verwenden.",
+    "description": "Style Inspector Lite: exportAuditOnly"
+  },
+  "exportUnavailable": {
+    "message": "Nicht verfügbare Quellen benötigen eine bestätigte Auswahl, einen Seitenscan oder einen ausdrücklich gewählten Vorschlag.",
+    "description": "Style Inspector Lite: exportUnavailable"
+  },
+  "exportFrozen": {
+    "message": "Dieser Export verwendet einen festen Mess-Snapshot.",
+    "description": "Style Inspector Lite: exportFrozen"
+  },
+  "exportInvalid": {
+    "message": "Dieser Export ist nicht mehr gültig. Zurück zum Inspector gehen und aktuelle Daten auswählen.",
+    "description": "Style Inspector Lite: exportInvalid"
+  },
+  "exportUnsupported": {
+    "message": "Einige Messwerte wurden ausgelassen, da keine sichere Darstellung verfügbar ist.",
+    "description": "Style Inspector Lite: exportUnsupported"
+  },
+  "tailwindHelp": {
+    "message": "Tailwind CSS v4: vollständige Klassen in eine Quelldatei deines Tailwind-Builds kopieren. Das vollständige Element wird damit nicht rekonstruiert.",
+    "description": "Style Inspector Lite: tailwindHelp"
+  },
+  "downloadPermission": {
+    "message": "Speichern benötigt die optionale Firefox-Downloadberechtigung. Kopieren bleibt ohne sie verfügbar.",
+    "description": "Style Inspector Lite: downloadPermission"
+  },
+  "footerNoData": {
+    "message": "Keine bestätigten Daten für diese Ansicht vorhanden",
+    "description": "Style Inspector Lite: footerNoData"
+  },
+  "footerPreview": {
+    "message": "Elementauswahl vor Kopieren oder Exportieren bestätigen",
+    "description": "Style Inspector Lite: footerPreview"
+  },
+  "footerSettings": {
+    "message": "Kopieren und Exportieren sind in den Einstellungen nicht verfügbar",
+    "description": "Style Inspector Lite: footerSettings"
+  },
+  "copyTextReport": {
+    "message": "Lesbaren Textbericht kopieren",
+    "description": "Style Inspector Lite: copyTextReport"
+  },
+  "copyCss": {
+    "message": "Gemessene CSS-Werte kopieren",
+    "description": "Style Inspector Lite: copyCss"
+  },
+  "copyExport": {
+    "message": "Exakte Exportvorschau kopieren",
+    "description": "Style Inspector Lite: copyExport"
+  },
+  "error_activation_required": {
+    "message": "Prüfe die aktuelle Seite im Seiten-Audit, um sie zu aktivieren, oder verwende vor dem Untersuchen den Toolbar-Button.",
+    "description": "Style Inspector Lite: error_activation_required"
+  },
+  "error_unsupported_page": {
+    "message": "Diese Seite erlaubt keine Untersuchung durch Erweiterungen.",
+    "description": "Style Inspector Lite: error_unsupported_page"
+  },
+  "error_unsupported_frame": {
+    "message": "Dieser Frame gehört nicht zum unterstützten Hauptdokument.",
+    "description": "Style Inspector Lite: error_unsupported_frame"
+  },
+  "error_target_expired": {
+    "message": "Das Ziel ist nicht mehr verfügbar. Element erneut auswählen.",
+    "description": "Style Inspector Lite: error_target_expired"
+  },
+  "error_element_removed": {
+    "message": "Dieses Element wurde entfernt. Ein aktuelles Element auswählen.",
+    "description": "Style Inspector Lite: error_element_removed"
+  },
+  "error_stale_document": {
+    "message": "Das Dokument hat sich geändert. Erneut aktivieren und auswählen.",
+    "description": "Style Inspector Lite: error_stale_document"
+  },
+  "error_storage_failed": {
+    "message": "Die Vorgabe konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "description": "Style Inspector Lite: error_storage_failed"
+  },
+  "error_download_permission": {
+    "message": "Downloadberechtigung wurde nicht erteilt. Du kannst den Export weiterhin kopieren.",
+    "description": "Style Inspector Lite: error_download_permission"
+  },
+  "error_download_failed": {
+    "message": "Die Datei konnte nicht gespeichert werden. Der Export kann weiterhin kopiert werden.",
+    "description": "Style Inspector Lite: error_download_failed"
+  },
+  "error_invalid_message": {
+    "message": "Die angeforderte Aktion konnte nicht ausgeführt werden.",
+    "description": "Style Inspector Lite: error_invalid_message"
+  },
+  "error_connection": {
+    "message": "Die Verbindung zur Erweiterung wurde unterbrochen. Seitenaktionen sind vorübergehend nicht verfügbar.",
+    "description": "Style Inspector Lite: error_connection"
+  },
+  "error_generic": {
+    "message": "Diese Aktion konnte nicht ausgeführt werden. Erneut messen und versuchen.",
+    "description": "Style Inspector Lite: error_generic"
+  },
+  "reason_unknown": {
+    "message": "Die automatische Prüfung kann diese Messung nicht verlässlich bewerten.",
+    "description": "Style Inspector Lite: reason_unknown"
+  },
+  "auditCaution": {
+    "message": "Diese Prüfungen belegen keine vollständige Barrierefreiheit. Kontrast- und Lesbarkeitsbefunde werden getrennt gezählt.",
+    "description": "Style Inspector Lite: auditCaution"
+  },
+  "auditCounts": {
+    "message": "Erfüllt $value1$ · Nicht erfüllt $value2$ · Seitendarstellung ungeprüft $value3$ · Nicht anwendbar $value4$",
+    "description": "Style Inspector Lite: auditCounts",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      },
+      "value3": {
+        "content": "$3"
+      },
+      "value4": {
+        "content": "$4"
+      }
+    }
+  },
+  "auditFontCounts": {
+    "message": "Schwelle eingehalten $value1$ · Unter Schwelle $value2$ · Nicht bewertbar $value3$ · Nicht anwendbar $value4$",
+    "description": "Style Inspector Lite: auditFontCounts",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      },
+      "value3": {
+        "content": "$3"
+      },
+      "value4": {
+        "content": "$4"
+      }
+    }
+  },
+  "auditTitle": {
+    "message": "Seiten-Audit-Bericht",
+    "description": "Style Inspector Lite: auditTitle"
+  },
+  "auditScopeLabel": {
+    "message": "Hauptdokument; kein automatisches Scrollen oder Nachladen.",
+    "description": "Style Inspector Lite: auditScopeLabel"
+  },
+  "reasonLabel": {
+    "message": "Messgrenzen",
+    "description": "Style Inspector Lite: reasonLabel"
+  },
+  "rules": {
+    "message": "Regeln",
+    "description": "Style Inspector Lite: rules"
+  },
+  "cssValue": {
+    "message": "CSS-Wert",
+    "description": "Style Inspector Lite: cssValue"
+  }
+}

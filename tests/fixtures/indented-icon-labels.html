@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Indented labels behind image icons</title>
+<style>
+  html, body { margin: 0; background: #FFF; font: 14px Arial, sans-serif; }
+  body { padding: 24px; }
+  .row { margin: 10px 0; padding-left: 200px; }
+  .icon { display: block; width: 36px; height: 36px; overflow: hidden; text-indent: -999px;
+    white-space: nowrap; color: #09F; text-decoration: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='15' cy='15' r='7' fill='none' stroke='%23777' stroke-width='3'/%3E%3Cpath d='M21 21l8 8' stroke='%23777' stroke-width='3'/%3E%3C/svg%3E") center / 36px 36px no-repeat; }
+  .icon:hover { background-color: #DDD; }
+  .icon:active { background-color: #BBB; }
+  .positive { text-indent: 999px; }
+  .partial { text-indent: -8px; }
+  .visible { overflow: visible; text-indent: -100px; }
+  .offscreen { overflow: visible; }
+  .shadow { text-shadow: 999px 0 #000; }
+  .percent { text-indent: -1000%; }
+</style>
+<div class="row"><a id="reported" href="#" class="icon" data-runs="0">Search</a></div>
+<div class="row"><a id="positive" href="#" class="icon positive" data-runs="0">Search</a></div>
+<div class="row"><a id="partial" href="#" class="icon partial" data-runs="1">Search</a></div>
+<div class="row"><a id="visible" href="#" class="icon visible" data-runs="1">Search</a></div>
+<div class="row"><a id="offscreen" href="#" class="icon offscreen" data-runs="1">Search</a></div>
+<div class="row"><a id="shadow" href="#" class="icon shadow" data-runs="1">Search</a></div>
+<div class="row"><a id="percent" href="#" class="icon percent" data-runs="1">Search</a></div>
+<script>document.addEventListener('click', event => event.preventDefault());</script>
+</html>

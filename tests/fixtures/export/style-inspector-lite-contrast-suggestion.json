@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 2,
+  "generator": {
+    "name": "Style Inspector Lite",
+    "version": "1.0.0"
+  },
+  "kind": "contrast-suggestion",
+  "metadata": {
+    "measuredAt": "2026-10-18T12:00:00.000Z",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "stale": false,
+    "limitations": [
+      "main-document-only"
+    ]
+  },
+  "warnings": [],
+  "property": "color",
+  "oldValue": "#AAAAAA",
+  "newValue": "#767676",
+  "color": {
+    "r": 118,
+    "g": 118,
+    "b": 118,
+    "a": 1
+  },
+  "originalForeground": {
+    "r": 170,
+    "g": 170,
+    "b": 170,
+    "a": 1
+  },
+  "originalBackground": {
+    "r": 255,
+    "g": 255,
+    "b": 255,
+    "a": 1
+  },
+  "beforeRatio": 2.3231230535045992,
+  "afterRatio": 4.542224959605253,
+  "category": "normal",
+  "target": "AA",
+  "threshold": 4.5,
+  "source": "computed",
+  "conditions": [
+    "same-text-run",
+    "same-font-size-and-weight",
+    "unchanged-background",
+    "current-measurement-only"
+  ],
+  "algorithmVersion": "oklch-lightness-v1",
+  "applied": false,
+  "generatedSelector": ".sil-inspected-element"
+}

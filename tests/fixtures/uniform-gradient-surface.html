@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Opaque uniform gradient surfaces inside selected controls</title>
+<style>
+  html, body { margin: 0; background: #FFF; font: 10px/16px Arial, sans-serif; color: #565959; }
+  body { padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; }
+  .selected { width: 150px; height: 108px; border: 1px solid #2162A1; background: #2162A1; border-radius: 8px; }
+  .inner { position: relative; height: 100%; box-sizing: border-box; border-radius: 7px; padding: 40px 20px;
+    background-image: linear-gradient(0deg, #FFF, #FFF), linear-gradient(0deg, #888C8C, #888C8C);
+    background-origin: padding-box; background-clip: border-box; background-size: auto; background-repeat: repeat;
+    box-shadow: inset 0 0 0 2px #2162A1; }
+  .price { position: relative; display: inline-block; }
+  .reported { width: 73px; height: 113px; }
+  .reported .inner { padding: 92px 4px 5px; }
+  .strike .price::after { content: ''; position: absolute; top: 50%; left: 0; right: 0; border-top: 1px solid currentColor; }
+  .control { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 20; appearance: button;
+    padding: 0; border: 0; outline: 0; color: transparent; background: transparent; opacity: .01; }
+  .sized .inner { background-size: 5px 5px; background-repeat: no-repeat; }
+  .offset .inner { background-position: 100px 100px; background-repeat: no-repeat; }
+  .text-clip .inner { background-clip: text; }
+  .shadow .inner { box-shadow: inset 0 0 0 60px #000; }
+  .variable .inner { background-image: linear-gradient(#FFF, #000), linear-gradient(#888C8C, #888C8C); }
+  .alpha .inner { background-image: linear-gradient(rgb(255 255 255 / .8), rgb(255 255 255 / .8)), linear-gradient(#888C8C, #888C8C); }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    for (const [id, className, solid, verdict] of [
+      ['reported', 'reported strike', true, 'manual'],
+      ['plain', '', true, 'pass'],
+      ['dynamic', '', true, 'pass'],
+      ['small-image', 'sized', false, 'manual'],
+      ['shifted-image', 'offset', false, 'manual'],
+      ['text-clip', 'text-clip', false, 'manual'],
+      ['inset-shadow', 'shadow', false, 'manual'],
+      ['real-gradient', 'variable', false, 'manual'],
+      ['translucent', 'alpha', false, 'manual'],
+    ]) {
+      const card = document.createElement('div'); card.className = 'selected ' + className;
+      const inner = document.createElement('div'); inner.className = 'inner';
+      if (id === 'reported') {
+        const input = document.createElement('input'); input.type = 'submit'; input.className = 'control';
+        input.value = 'PRIVATE_SWATCH_CONTROL_SENTINEL'; inner.append(input);
+      }
+      const price = document.createElement('span'); price.className = 'price';
+      const text = document.createElement('span'); text.id = id; text.textContent = '82,95€';
+      text.dataset.solid = String(solid); text.dataset.verdict = verdict;
+      price.append(text); inner.append(price); card.append(inner); document.body.append(card);
+    }
+  });
+</script>
+<body></body>
+</html>

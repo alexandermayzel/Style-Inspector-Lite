@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Explicit selection text excerpts</title>
+<style>
+  body { margin: 20px; background: #FFF; color: #222; font: 16px/24px Arial, sans-serif; }
+  #simple, #choice { display: block; width: 520px; padding: 12px; margin-bottom: 12px; background: #FFF; }
+  .bounded { display: block; width: 520px; white-space: nowrap; overflow: hidden; }
+  .hidden { display: none; }
+</style>
+<div id="excerpt-root" title="PRIVATE_ATTRIBUTE_SENTINEL" aria-label="PRIVATE_ARIA_SENTINEL">
+  <div id="simple">Selected text &lt;em&gt; stays plain &amp; safe.</div>
+  <div id="choice">First visible excerpt.<br>Second visible excerpt.</div>
+  <div id="ordinary">Ordinary <strong>nested</strong> text.</div>
+  <span id="hidden" class="hidden">PRIVATE_HIDDEN_SENTINEL</span>
+  <span id="invisible" style="visibility:hidden">PRIVATE_INVISIBLE_SENTINEL</span>
+  <span id="transparent" style="opacity:0">PRIVATE_TRANSPARENT_SENTINEL</span>
+  <input id="input" value="PRIVATE_INPUT_SENTINEL" placeholder="PRIVATE_PLACEHOLDER_SENTINEL">
+  <input id="password" type="password" value="PRIVATE_PASSWORD_SENTINEL">
+  <textarea id="textarea">PRIVATE_TEXTAREA_SENTINEL</textarea>
+  <select id="select"><option>PRIVATE_OPTION_SENTINEL</option></select>
+  <div id="editable" contenteditable="true"><span>PRIVATE_EDITABLE_SENTINEL</span></div>
+  <div id="plaintext" contenteditable="plaintext-only">PRIVATE_PLAINTEXT_SENTINEL</div>
+  <div id="uppercase-editable" contenteditable="TRUE">PRIVATE_UPPERCASE_EDITABLE_SENTINEL</div>
+  <div id="noneditable" contenteditable="false">PRIVATE_NONEDITABLE_SENTINEL</div>
+  <div id="textbox" role="textbox"><span>PRIVATE_TEXTBOX_SENTINEL</span></div>
+  <div id="combobox" role="combobox">PRIVATE_COMBOBOX_SENTINEL</div>
+  <div id="fallback-role" role="textbox generic">PRIVATE_ROLE_LIST_SENTINEL</div>
+  <svg id="vector" width="100" height="24"><title>PRIVATE_SVG_TITLE_SENTINEL</title><text x="0" y="18">PRIVATE_SVG_SENTINEL</text></svg>
+  <canvas id="canvas" width="100" height="24">PRIVATE_CANVAS_SENTINEL</canvas>
+  <script type="application/json">{"text":"PRIVATE_SCRIPT_SENTINEL"}</script>
+  <template>PRIVATE_TEMPLATE_SENTINEL</template>
+</div>
+<div id="long" class="bounded"></div>
+<div id="many"></div>
+<script>
+  document.getElementById('long').textContent = 'A'.repeat(499) + '😀' + 'Z'.repeat(5000);
+  for (let i = 0; i < 8; i++) {
+    const part = document.createElement('span'); part.className = 'bounded';
+    part.textContent = `Excerpt ${i + 1} ` + 'T'.repeat(600);
+    document.getElementById('many').append(part);
+  }
+</script>
+</html>

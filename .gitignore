@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+test-results/
+.cache/
+*.log
+*.zip
+*.xpi
+.env
+.env.*
+!.env.example
+/internal/spec/

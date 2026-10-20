@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Generated separators around ordinary text</title>
+<style>
+  html, body { background: #0F0F0F; color: #AAAAAA; font: 14px/20px Arial, sans-serif; }
+  body { margin: 20px; display: grid; grid-template-columns: 300px 300px; gap: 12px; }
+  section { min-height: 34px; }
+  .stamp { display: flow-root; width: max-content; }
+  .metadata { display: flex; flex-wrap: wrap; overflow: hidden; max-height: 40px; }
+  .metadata .stamp { display: block; }
+  .before::before { content: "•"; margin: 0 4px; }
+  .after::after { content: "|"; margin: 0 4px; }
+  .inline { display: inline; }
+  .inline-block { display: inline-block; }
+  .boxed::before { display: inline-block; width: 8px; }
+  .flex { display: flex; flex-flow: row nowrap; gap: 8px; width: max-content; }
+  .flex > span { flex: 0 0 auto; }
+  .negative::before { margin-right: -4px; }
+  .shifted::before { position: relative; left: 20px; }
+  .shadow::before { text-shadow: 20px 0 4px #FFFFFF; }
+  .rtl { direction: rtl; }
+  .multiline { width: 70px; }
+  .reordered > span:first-child { order: 2; }
+  .moved > span:first-child { position: relative; left: 60px; }
+  .wide::before { display: inline-block; width: 1px; content: "WWWWWW"; }
+  .narrow { width: 50px; }
+  .clipped { overflow: hidden; text-overflow: ellipsis; width: 70px; white-space: nowrap; }
+  .turn::after, .turn-before::before { content: "/"; display: block; width: 18px; transform: rotate(180deg); }
+  .turn-origin::after { transform-origin: 0 50%; }
+  .quarter-turn::after { transform: rotate(90deg); }
+</style>
+<section class="metadata"><span id="timestamp" class="stamp before" data-flow="pass">2 hours ago</span></section>
+<section><span id="inline-before" class="before inline" data-flow="pass">Inline time</span></section>
+<section><span id="inline-after" class="after inline" data-flow="pass">Inline link</span></section>
+<section><span id="block-after" class="stamp after" data-flow="pass">Block link</span></section>
+<section><span id="boxed-before" class="stamp before boxed" data-flow="pass">Boxed mark</span></section>
+<section><span id="inline-block" class="before inline-block" data-flow="pass">Inline block</span></section>
+<section><div id="flex-before" class="flex before" data-flow="pass,pass"><span>First</span><span>Second</span></div></section>
+<section><div id="flex-after" class="flex after" data-flow="pass,pass"><span>First</span><span>Second</span></div></section>
+<section><span id="negative-before" class="stamp before negative" data-flow="manual">Negative gap</span></section>
+<section><span id="shifted-before" class="stamp before shifted" data-flow="manual">Moved mark</span></section>
+<section><span id="shadow-before" class="stamp before shadow" data-flow="manual">Painted shadow</span></section>
+<section><span id="rtl-before" class="stamp before rtl" data-flow="manual">RTL text</span></section>
+<section><span id="multiline-before" class="stamp before multiline" data-flow="manual">More than one line of text</span></section>
+<section><div id="reordered" class="flex after reordered" data-flow="manual,manual"><span>First</span><span>Second</span></div></section>
+<section><div id="moved" class="flex before moved" data-flow="manual,manual"><span>First</span><span>Second</span></div></section>
+<section><span id="overflowing-mark" class="stamp before wide" data-flow="manual">Wide mark</span></section>
+<section><div id="narrow-flex" class="flex before narrow" data-flow="manual,manual"><span>First label</span><span>Second label</span></div></section>
+<section><span id="clipped-before" class="stamp before clipped" data-flow="manual">A long clipped label</span></section>
+<section><a id="turned-after" class="flex turn" data-flow="pass">View offer</a></section>
+<section><a id="turned-before" class="flex turn-before" data-flow="pass">Leading icon</a></section>
+<section><a id="turned-origin" class="flex turn turn-origin" data-flow="manual">Shifted rotation</a></section>
+<section><a id="quarter-turn" class="flex turn quarter-turn" data-flow="manual">Quarter rotation</a></section>
+</html>

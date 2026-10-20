@@ -1,0 +1,6 @@
+/* Contrast suggestion; not applied. Only this text run and unchanged opposite color are covered. Measured: 2026-10-18T12:00:00.000Z; page viewport: 1280x800 CSS px. Original foreground: #AAAAAA; original background: #FFFFFF. Target: AA; threshold: 4.5:1; before: 2.3231230535045992:1; after: 4.542224959605253:1. Font size and weight must remain unchanged. */
+$sil-color: #767676;
+
+.sil-inspected-element {
+  color: $sil-color;
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Positioned text inside translated carousel clips</title>
+<style>
+  html, body { margin: 0; background: #FFF; color: #111; font: 14px/20px Arial, sans-serif; }
+  body { padding: 24px; }
+  .scenario { position: relative; width: 440px; min-height: 60px; margin-bottom: 24px; }
+  .viewport { width: 400px; height: 160px; overflow: hidden; background: #EEE; }
+  .rail { position: relative; display: flex; width: 1200px; height: 160px; transform: translateX(-400px); }
+  .slide { position: relative; flex: 0 0 400px; height: 160px; }
+  .countdown { position: absolute; left: 16px; top: 12px; white-space: nowrap; transform-style: preserve-3d; transform: translateX(0); }
+  .badge-container { position: absolute; left: 16px; top: 44px; width: 180px; height: 20px; }
+  .badge { position: absolute; left: 0; top: 0; white-space: nowrap; font-style: italic; }
+  .price { position: absolute; left: 16px; top: 76px; white-space: nowrap; text-decoration: line-through; }
+  .edge { position: absolute; left: 392px; top: 108px; white-space: nowrap; }
+  .short-clip { width: 100px; height: 40px; overflow: hidden; }
+  .escaping { position: absolute; left: 150px; top: 0; white-space: nowrap; }
+  .fixed { position: fixed; left: 24px; top: 740px; white-space: nowrap; background: #FFF; }
+  .sticky { position: sticky; top: 0; display: block; width: 180px; margin-left: 150px; white-space: nowrap; }
+  .vertical-clip { width: 400px; height: 20px; overflow: hidden; }
+  .vertical-price { display: block; margin-top: 50px; text-decoration: line-through; }
+  .uncertain-3d { position: relative; display: inline-block; left: 150px; white-space: nowrap; transform-style: preserve-3d; }
+  .rotated-3d { transform: rotateY(20deg); }
+  .perspective-clip { perspective: 400px; }
+  .top-layer { position: relative; margin: 0; inset: 100px auto auto 24px; padding: 8px; border: 1px solid #555; background: #FFF; color: #111; }
+</style>
+<!-- Ordinary synthetic text only. The first/third slide are outside the
+     overflow viewport; the relative cards still contain their absolute text. -->
+<section class="scenario" id="carousel-case">
+  <div id="viewport" class="viewport"><div id="rail" class="rail">
+    <div class="slide">
+      <span id="hidden-absolute" class="countdown">First countdown</span>
+      <div class="badge-container"><span id="hidden-nested-absolute" class="badge">First nested badge</span></div>
+      <del id="hidden-del" class="price">Previous price 100</del>
+    </div>
+    <div class="slide">
+      <span id="visible-absolute" class="countdown">Second countdown</span>
+      <div class="badge-container"><span id="visible-nested-absolute" class="badge">Second nested badge</span></div>
+      <del id="visible-del" class="price">Previous price 200</del>
+      <span id="partial-text" class="edge">Partially visible edge</span>
+    </div>
+    <div class="slide"><span id="hidden-right" class="countdown">Third countdown</span></div>
+  </div></div>
+</section>
+<!-- This absolute descendant escapes the static clip: its containing block
+     is the surrounding positioned scenario, outside the clipping element. -->
+<section class="scenario"><div class="short-clip"><span id="escape-absolute" class="escaping">Escaping absolute text</span></div></section>
+<section class="scenario"><div class="short-clip"><span id="escape-fixed" class="fixed">Escaping fixed text</span></div></section>
+<!-- Sticky positioning and vertical text decoration remain conservative. -->
+<section class="scenario"><div class="short-clip"><span id="sticky-text" class="sticky">Sticky text retained</span></div></section>
+<section class="scenario"><div class="vertical-clip"><del id="vertical-del" class="vertical-price">Vertical decoration retained</del></div></section>
+<!-- Actual 3D rotation and ancestor perspective stay outside the simple proof. -->
+<section class="scenario"><div class="short-clip"><span id="rotated-3d" class="uncertain-3d rotated-3d">Rotated text retained</span></div></section>
+<section class="scenario"><div class="short-clip perspective-clip"><span id="perspective-text" class="uncertain-3d">Perspective text retained</span></div></section>
+<!-- Tests open this explicitly. A top-layer box ignores ancestor overflow. -->
+<section class="scenario"><div class="short-clip" style="position: relative"><div id="top-layer" class="top-layer" popover="manual">Top-layer text retained</div></div></section>
+</html>

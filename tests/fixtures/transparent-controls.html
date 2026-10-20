@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Transparent native button labels</title>
+<style>
+  html, body { margin: 0; background: #FFFFFF; color: #111111; font: 14px/24px Arial, sans-serif; }
+  body { display: grid; grid-template-columns: 260px 260px; gap: 18px; padding: 24px; }
+  input { box-sizing: border-box; width: 240px; height: 36px; font: inherit; }
+  .transparent { color: transparent; background: transparent; }
+  .fill-hidden { color: #111111; -webkit-text-fill-color: transparent; }
+  .low-opacity { opacity: 0.01; }
+  .fill-visible { color: transparent; -webkit-text-fill-color: #111111; }
+  .shadow { text-shadow: 1px 0 #111111; }
+  .stroke { -webkit-text-stroke: 1px #111111; }
+  .emphasis { text-emphasis: circle #111111; }
+  .decoration { text-decoration: underline #111111; }
+  .gradient { background: linear-gradient(#111111, #111111); background-clip: text; }
+  .search::placeholder { color: #111111; opacity: 1; }
+  .overlay { position: relative; box-sizing: border-box; width: 240px; height: 36px; background: #FFA41C; color: #0F1111; text-align: center; line-height: 36px; }
+  .overlay input { position: absolute; inset: 0; appearance: button; opacity: 0.01; }
+</style>
+<input id="hidden-button" data-control="hidden" type="button" class="transparent" value="Hidden button label">
+<input id="hidden-submit" data-control="hidden" type="submit" class="transparent low-opacity" value="Hidden submit label">
+<input id="hidden-reset" data-control="hidden" type="reset" class="transparent" value="Hidden reset label">
+<input id="fill-hidden" data-control="hidden" type="button" class="fill-hidden" value="Hidden fill override">
+<input id="visible-low-opacity" data-control="retained" type="button" class="low-opacity" value="Faint visible glyphs">
+<input id="visible-fill" data-control="retained" type="button" class="fill-visible" value="Visible fill override">
+<input id="shadow-button" data-control="retained" type="button" class="transparent shadow" value="Visible text shadow">
+<input id="stroke-button" data-control="retained" type="button" class="transparent stroke" value="Visible text stroke">
+<input id="emphasis-button" data-control="retained" type="button" class="transparent emphasis" value="Emphasized text">
+<input id="decoration-button" data-control="retained" type="button" class="transparent decoration" value="Decorated text">
+<input id="gradient-button" data-control="retained" type="button" class="transparent gradient" value="Paint inside glyphs">
+<input id="search-input" data-control="retained" type="search" class="transparent search" placeholder="Visible placeholder">
+<div class="overlay"><span id="overlay-label" data-control="retained">Visible sibling label</span><input id="overlay-hidden" data-control="hidden" type="button" class="transparent" value="Invisible native target"></div>
+</html>

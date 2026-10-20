@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 2,
+  "generator": {
+    "name": "Style Inspector Lite",
+    "version": "1.0.0"
+  },
+  "kind": "element",
+  "metadata": {
+    "measuredAt": "2026-10-18T12:00:00.000Z",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "stale": false,
+    "limitations": [
+      "main-document-only"
+    ]
+  },
+  "warnings": [],
+  "groups": [
+    "colors",
+    "typography",
+    "layout"
+  ],
+  "generatedSelector": ".sil-inspected-element",
+  "styles": [
+    {
+      "group": "colors",
+      "property": "color",
+      "raw": "#aaaaaa",
+      "formatted": "#AAAAAA",
+      "rgba": {
+        "r": 170,
+        "g": 170,
+        "b": 170,
+        "a": 1
+      }
+    },
+    {
+      "group": "colors",
+      "property": "background-color",
+      "raw": "#ffffff",
+      "formatted": "#FFFFFF",
+      "rgba": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      }
+    },
+    {
+      "group": "typography",
+      "property": "font-family",
+      "raw": "\"Example Sans\", sans-serif",
+      "formatted": "\"Example Sans\", sans-serif"
+    },
+    {
+      "group": "typography",
+      "property": "font-size",
+      "raw": "11.99px",
+      "formatted": "11.99px"
+    },
+    {
+      "group": "typography",
+      "property": "font-weight",
+      "raw": "400",
+      "formatted": "400"
+    },
+    {
+      "group": "typography",
+      "property": "line-height",
+      "raw": "18px",
+      "formatted": "18px"
+    },
+    {
+      "group": "layout",
+      "property": "box-sizing",
+      "raw": "border-box",
+      "formatted": "border-box"
+    },
+    {
+      "group": "layout",
+      "property": "display",
+      "raw": "inline-flex",
+      "formatted": "inline-flex"
+    },
+    {
+      "group": "layout",
+      "property": "width",
+      "raw": "160px",
+      "formatted": "160px"
+    },
+    {
+      "group": "layout",
+      "property": "border-top-width",
+      "raw": "1px",
+      "formatted": "1px"
+    },
+    {
+      "group": "layout",
+      "property": "border-top-style",
+      "raw": "solid",
+      "formatted": "solid"
+    },
+    {
+      "group": "layout",
+      "property": "padding-top",
+      "raw": "16px",
+      "formatted": "16px"
+    },
+    {
+      "group": "layout",
+      "property": "padding-right",
+      "raw": "24px",
+      "formatted": "24px"
+    }
+  ],
+  "textRuns": [
+    {
+      "reference": "text-0001",
+      "tagName": "p",
+      "foreground": {
+        "raw": "#aaaaaa",
+        "rgba": {
+          "r": 170,
+          "g": 170,
+          "b": 170,
+          "a": 1
+        }
+      },
+      "cssBackground": {
+        "raw": "#ffffff",
+        "rgba": {
+          "r": 255,
+          "g": 255,
+          "b": 255,
+          "a": 1
+        }
+      },
+      "effectiveBackground": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "fontSizeCssPx": 11.99,
+      "fontWeight": 400,
+      "contrast": {
+        "ruleId": "text.contrast",
+        "ratio": 2.3231230535045992,
+        "category": "normal",
+        "target": "AA",
+        "threshold": 4.5,
+        "status": "fail",
+        "AA": {
+          "threshold": 4.5,
+          "status": "fail"
+        },
+        "AAA": {
+          "threshold": 7,
+          "status": "fail"
+        }
+      },
+      "fontSize": {
+        "ruleId": "text.font-size-min",
+        "fontSizeCssPx": 11.99,
+        "thresholdCssPx": 12,
+        "operator": "lt",
+        "category": "readability",
+        "normative": false,
+        "status": "fail"
+      }
+    }
+  ],
+  "visualRect": {
+    "width": 200,
+    "height": 50
+  },
+  "target": "AA"
+}

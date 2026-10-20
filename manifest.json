@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extensionName__",
+  "description": "__MSG_extensionDescription__",
+  "version": "1.0.1",
+  "default_locale": "en",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{a30cb25b-cf2b-4740-8612-e39ae9ac7021}",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  },
+  "permissions": ["activeTab", "scripting", "storage", "menus", "clipboardWrite"],
+  "optional_permissions": ["downloads"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "scripts": ["background.js"] },
+  "action": {
+    "default_title": "__MSG_extensionName__",
+    "default_icon": { "16": "assets/icon-16.png", "32": "assets/icon-32.png" }
+  },
+  "sidebar_action": {
+    "default_panel": "sidebar/index.html",
+    "default_title": "__MSG_extensionName__",
+    "default_icon": "assets/icon-32.png",
+    "open_at_install": false
+  },
+  "commands": { "_execute_action": { "description": "__MSG_commandOpen__" } },
+  "icons": { "48": "assets/icon-48.png", "96": "assets/icon-96.png" },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none';" }
+}

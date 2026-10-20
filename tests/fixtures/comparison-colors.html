@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Covered gradients, modern colors and sibling control hints</title>
+<style>
+  html, body { margin: 0; color: #FCFCFC; background: #212831; font: 11px Verdana, sans-serif; }
+  body { padding: 24px; }
+  .row { margin-bottom: 20px; }
+  .offer { display: inline-block; color: #030303; font-size: 12.1px; text-decoration: none;
+    padding: 4.84px 8.47px; border: 1px solid #D3B526; border-radius: 3.63px;
+    background-image: linear-gradient(#F7E852, #FAD86E); }
+  .partial { background-size: 50% 100%; background-repeat: no-repeat; }
+  .offset { background-position: 20px 0; background-repeat: no-repeat; }
+  .translucent { background-image: linear-gradient(rgb(247 232 82 / .7), rgb(250 216 110 / .7)); }
+  .modern-gradient { background-image: linear-gradient(oklch(.6 .1 40), oklch(.8 .1 70)); }
+  .badge { display: inline-block; padding: 4px 8px; font-size: 11.2px;
+    color: oklch(.266811 .0849344 95.9668); background: oklch(1 .0679475 95.9668); }
+  .search { position: relative; width: 360px; height: 43px; }
+  input { box-sizing: border-box; width: 360px; height: 43px; appearance: none; border: 1px solid #A6A6A6;
+    border-radius: 4px; padding: 10px 136px 10px 12px; color: #E6E6E6; background: #29323D;
+    box-shadow: 2px 2px 14px -8px rgb(0 0 0 / .4); font: 16px sans-serif; }
+  .hint { position: absolute; pointer-events: none; display: flex; align-items: center; right: 56px;
+    top: 50%; transform: translateY(-50%); padding: 4px 5px; color: #BFBFBF; font-size: 11px; }
+  .hint::after { content: '/'; display: flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; margin-left: 5px; border: 1px solid currentColor; border-radius: 4px;
+    box-shadow: 1px 1px 1px currentColor; font: 12px monospace; }
+  .no-padding input { padding-right: 12px; }
+  .unknown-input input { background-image: linear-gradient(#29323D, #000); }
+</style>
+<div class="row"><a id="gradient" href="#" class="offer">View offer</a></div>
+<div class="row"><a id="partial-gradient" href="#" class="offer partial">View offer</a></div>
+<div class="row"><a id="offset-gradient" href="#" class="offer offset">View offer</a></div>
+<div class="row"><a id="alpha-gradient" href="#" class="offer translucent">View offer</a></div>
+<div class="row"><a id="modern-gradient" href="#" class="offer modern-gradient">View offer</a></div>
+<div class="row"><div id="oklch" class="badge">Price notice</div></div>
+<div style="display: contents"><div class="row search"><div id="control-hint" class="hint">Press</div><input type="search" value="PRIVATE_COMPARISON_INPUT_SENTINEL"></div></div>
+<div class="row search no-padding"><input type="search"><div id="content-hint" class="hint">Press</div></div>
+<div class="row search unknown-input"><input type="search"><div id="unknown-hint" class="hint">Press</div></div>
+<script>document.addEventListener('click', event => event.preventDefault());</script>
+</html>

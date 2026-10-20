@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Text overlap and transparent logo padding regression</title>
+<style>
+  html, body { background: #0F0F0F; color: #AAAAAA; font: 14px/20px sans-serif; }
+  body { margin: 20px; display: grid; grid-template-columns: 340px 340px; gap: 20px; }
+  section { position: relative; height: 80px; }
+  .text { display: block; width: 120px; }
+  .cover { position: absolute; left: 0; top: 0; width: 120px; height: 20px; }
+  .solid { background: #FFFFFF; }
+  #logo-row { display: flex; height: 56px; }
+  #logo-wrap { display: inline-flex; position: relative; z-index: 1; padding: 18px 14px 18px 16px; }
+  #country { margin-top: 12px; margin-left: -10px; font-size: 10px; line-height: normal; }
+  #tall { height: 70px; }
+  #below-text { top: 28px; height: 25px; }
+  #painted-pseudo::after { content: ''; position: absolute; inset: 0; background: #FFFFFF; }
+  #shadow-source { position: absolute; left: 200px; width: 120px; height: 20px; box-shadow: -200px 0 #FFFFFF; pointer-events: none; }
+  .multiline { white-space: pre; }
+  .second-line { top: 20px; }
+  input { display: block; box-sizing: border-box; width: 120px; height: 20px; padding: 0; border: 0; font: inherit; color: #FFFFFF; background: #0F0F0F; }
+  input::placeholder { color: #AAAAAA; opacity: 1; }
+  #many-lines-section { grid-column: 1 / -1; height: auto; }
+</style>
+<body>
+<section><div id="logo-row"><div id="logo-wrap"><svg id="logo-paint" width="93" height="20" viewBox="0 0 93 20"><rect width="93" height="20" fill="#FFFFFF"/></svg></div><span id="country" data-overlap="pass">DE</span></div></section>
+<section><span id="tall" class="text" data-overlap="pass">Visible text</span><div id="below-text" class="cover solid"></div></section>
+<section><span id="solid-text" class="text" data-overlap="manual">Solid overlay</span><div id="solid-overlay" class="cover solid"></div></section>
+<section><span id="svg-text" class="text" data-overlap="manual">SVG overlay</span><div class="cover"><svg width="120" height="20" viewBox="0 0 120 20" style="pointer-events: none"><rect width="120" height="20" fill="#FFFFFF"/></svg></div></section>
+<section><span id="pseudo-text" class="text" data-overlap="manual">Pseudo overlay</span><div id="painted-pseudo" class="cover"></div></section>
+<section><span id="shadow-text" class="text" data-overlap="manual">Shadow overlay</span><div id="painted-shadow" class="cover"><div id="shadow-source"></div></div></section>
+<section><span id="multiline" class="text multiline" data-overlap="manual">First line
+Second line</span><div class="cover solid second-line"></div></section>
+<section><span id="separate-nodes" class="text" data-overlap="pass,manual">First node<br>Second node</span><div class="cover solid second-line"></div></section>
+<section><input id="placeholder-clear" data-overlap="pass" placeholder="PRIVATE_CLEAR_PLACEHOLDER" value=""></section>
+<section><input id="placeholder-covered" data-overlap="manual" placeholder="PRIVATE_COVERED_PLACEHOLDER" value=""><div class="cover solid"></div></section>
+<section id="many-lines-section"><span id="many-lines" class="text multiline" data-overlap="manual">Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line</span></section>
+</body></html>

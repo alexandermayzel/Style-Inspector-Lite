@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Trailing generated decoration and actual text overlap</title>
+<style>
+  html, body { background: #212831; color: #BFBFBF; font: 11px/16px Arial, sans-serif; }
+  body { margin: 20px; display: grid; grid-template-columns: 300px 300px; gap: 12px; }
+  section { position: relative; height: 58px; padding: 8px; }
+  .hint { position: relative; display: flex; flex-flow: row nowrap; align-items: center; justify-content: flex-start; width: 140px; height: 28px; background: #212831; }
+  .hint::after { content: "/"; position: static; display: block; flex: 0 0 auto; box-sizing: border-box; width: 20px; height: 20px; margin-left: 5px; border: 1px solid #BFBFBF; box-shadow: 1px 1px 1px 0 #000; color: #BFBFBF; font: 11px/18px Arial, sans-serif; text-align: center; }
+  #search { width: 73.83px; }
+  .separator::after { content: "|"; display: inline-block; box-sizing: border-box; width: 4px; height: 16px; margin: 0 4px; font: 11px/16px Arial, sans-serif; }
+  .crumb a { color: inherit; text-decoration: none; }
+  .translated-parent { transform: translate(8px, 2px); }
+  .translated { transform: translate(12px, 3px); }
+  .overlap::after { margin-left: -8px; }
+  .tight::after { margin-left: 0; }
+  .shadow::after { box-shadow: -12px 0 8px 2px #000; }
+  .rotated { transform: rotate(1deg); }
+  .scaled { transform: scale(1.1); }
+  .reverse { flex-direction: row-reverse; }
+  .wrap { flex-wrap: wrap; }
+  .image::after { content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='20' height='20' fill='white'/%3E%3C/svg%3E"); }
+  .overflow::after { content: "WWWWWW"; }
+  .multiline { white-space: pre; height: 48px; }
+  .layered-input { position: absolute; left: 8px; top: 8px; width: 180px; height: 28px; box-sizing: border-box; margin: 0; padding: 0; border: 0; color: #BFBFBF; background: #29323D; font: inherit; }
+  #layered-hint { position: absolute; left: 8px; top: 8px; pointer-events: none; background: transparent; }
+  .transparent-hit { position: absolute; inset: 0; opacity: 0; }
+</style>
+<section><div id="search" class="hint" data-pseudo="pass">Search</div></section>
+<section><span id="separator" class="separator" data-pseudo="pass">Link</span></section>
+<section><div class="hint crumb"><a id="breadcrumb" data-pseudo="pass">Breadcrumb</a></div></section>
+<section class="translated-parent"><div id="translated" class="hint translated" data-pseudo="pass">Translated</div></section>
+<section><div id="negative-gap" class="hint overlap" data-pseudo="manual">Overlap</div></section>
+<section><div id="tight-gap" class="hint tight" data-pseudo="manual">Tight gap</div></section>
+<section><div id="strong-shadow" class="hint shadow" data-pseudo="manual">Shadow</div></section>
+<section><div id="rotated" class="hint rotated" data-pseudo="manual">Rotation</div></section>
+<section><div id="scaled" class="hint scaled" data-pseudo="manual">Scale</div></section>
+<section><div id="reversed" class="hint reverse" data-pseudo="manual">Reversed</div></section>
+<section><div id="wrapped" class="hint wrap" data-pseudo="manual">Wrapping</div></section>
+<section><div id="image" class="hint image" data-pseudo="manual">Image</div></section>
+<section><div id="overflowing-glyph" class="hint overflow" data-pseudo="manual">Overflow</div></section>
+<section><div id="multiline" class="hint multiline" data-pseudo="manual">First line
+Second line</div></section>
+<section><div id="multiple-children" class="hint" data-pseudo="pass,pass"><span>First</span><span>Second</span></div></section>
+<section><input class="layered-input" value="PRIVATE_INPUT_VALUE_SENTINEL"><div id="layered-hint" class="hint" data-pseudo="manual">Hint</div><div class="transparent-hit"></div></section>
+</html>

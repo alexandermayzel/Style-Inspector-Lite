@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Offscreen text flow and uncertain layered backgrounds</title>
+<style>
+  html, body { margin: 0; color: #AAAAAA; font: 14px/20px Arial, sans-serif; }
+  body { min-height: 3600px; }
+  .surface { position: absolute; left: 40px; top: 1800px; width: 700px; height: 620px; padding: 20px; background: #0F0F0F; }
+  section { height: 52px; }
+  .label { display: inline-block; pointer-events: none; white-space: nowrap; }
+  .zero { position: relative; inset: 0; }
+  .floating { position: absolute; left: 20px; top: 150px; }
+  .moved { position: relative; left: 3px; }
+  .transformed { transform: translateX(3px); }
+  .negative { margin-left: -1px; }
+  .float { float: left; }
+  #own-opaque { position: absolute; left: 20px; top: 540px; padding: 8px; background: #0F0F0F; }
+  .outside { margin: 2700px 40px 0; }
+  .fake-background { display: contents; background: #0F0F0F; }
+  .too-small { width: 1px; height: 20px; background: #0F0F0F; }
+  .emphasis-surface { position: absolute; left: 40px; top: 40px; padding: 20px; background: #0F0F0F; }
+  #emphasis { display: inline-block; white-space: nowrap; font: 100px/120px Arial, sans-serif; }
+  #emphasis::after { content: "|"; display: inline; margin-left: 0; font: 100px/120px Arial, sans-serif; vertical-align: -80px; text-emphasis: "W" red; }
+  .touch-surface { position: absolute; left: 360px; top: 40px; padding: 20px; background: #0F0F0F; }
+  .touch-effect, .touch-effect > div { position: absolute; inset: 0; }
+  .touch-effect > div { background: #FFFFFF; opacity: 0; }
+</style>
+<main class="surface">
+  <section><span id="static-flow" class="label" data-offscreen="pass">Ordinary offscreen reply label</span></section>
+  <section><div class="zero"><span id="relative-zero" class="label" data-offscreen="pass">Relative zero offset label</span></div></section>
+  <section><div class="floating"><span id="absolute-parent" class="label" data-offscreen="manual">Floating transparent parent</span></div></section>
+  <section><div class="moved"><span id="relative-moved" class="label" data-offscreen="manual">Moved relative parent</span></div></section>
+  <section><div class="transformed"><span id="transformed-parent" class="label" data-offscreen="manual">Transformed parent</span></div></section>
+  <section><div class="negative"><span id="negative-margin" class="label" data-offscreen="manual">Negative margin parent</span></div></section>
+  <section><div class="float"><span id="floated-parent" class="label" data-offscreen="manual">Floating parent</span></div></section>
+  <span id="own-opaque" class="label" data-offscreen="pass">Opaque positioned label</span>
+</main>
+<div class="outside">
+  <section><div class="fake-background"><span id="contents-background" class="label" data-offscreen="manual" data-reason="unresolved-background" data-reasons="unresolved-background layered-background">A contents box cannot paint</span></div></section>
+  <section><div class="too-small"><span id="outside-background" class="label" data-offscreen="manual">Text outside the painted box</span></div></section>
+</div>
+<div class="emphasis-surface"><span id="emphasis" data-offscreen="manual" data-reason="pseudo-element">M</span></div>
+<div class="touch-surface"><span id="touch-label" class="label" data-offscreen="pass">Touch feedback label</span><div class="touch-effect"><div></div><div></div></div></div>
+<script>document.querySelector('.touch-effect').prepend(document.createTextNode(''));</script>
+</html>

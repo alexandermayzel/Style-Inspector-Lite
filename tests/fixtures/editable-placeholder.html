@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Pointer-transparent hint above an empty editable surface</title>
+<style>
+  html, body { margin: 0; background: #161717; color: white; font: 15px/22.05px Arial, sans-serif; }
+  * { outline: none; }
+  #under { position: absolute; left: 0; top: 0; width: 1000px; height: 500px; background: white; z-index: -1; }
+  #frame { position: relative; width: 500px; margin: 40px; padding: 20px; background: #242626; }
+  #wrapper { position: relative; width: 100%; }
+  #editor { max-height: 11.76em; min-height: 1.47em; overflow-x: hidden; overflow-y: auto; user-select: text; white-space: pre-wrap; word-break: break-word; }
+  #editor p { margin: 0; position: relative; }
+  #hint { position: absolute; inset: 0 auto 0 0; z-index: 2; color: rgba(255, 255, 255, .6); pointer-events: none; user-select: none; }
+  #overlay { display: none; position: absolute; inset: 0; z-index: 3; background: white; }
+</style>
+<div id="under"></div>
+<div id="frame"><div id="wrapper">
+  <div id="editor" contenteditable="true" role="textbox" aria-label="Synthetic message editor"><p dir="auto"><br></p></div>
+  <div aria-hidden="true"><div id="hint">Enter a message.</div></div>
+  <div id="overlay"></div>
+</div></div>
+</html>

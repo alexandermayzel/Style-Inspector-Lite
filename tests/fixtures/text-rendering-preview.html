@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Clipped previews with explicit font rendering</title>
+<style>
+  html, body { margin: 0; background: #161717; color: rgba(255, 255, 255, .6); font: 14px/20px Arial, sans-serif; }
+  .row { display: flex; position: relative; width: 1800px; height: 40px; }
+  .preview { width: 392.1px; min-width: 392.1px; }
+  .message { display: block; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pane { flex: 1; background: #AAA; }
+  .legible { text-rendering: optimizeLegibility; }
+  .kern { font-feature-settings: "kern"; }
+  .explicit { font-kerning: normal; }
+  .cover { display: none; position: absolute; inset: 0 auto auto 0; z-index: 3; width: 392.1px; height: 20px; background: #A00000; }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const cases = [['combined', 'legible kern'], ['render-only', 'legible'], ['kern-only', 'kern'], ['explicit-kern', 'legible kern explicit']];
+    const pieces = Array.from({length: 12}, (_, index) => index % 2
+      ? 'text ' + 'Synthetic descriptive text for a local preview sample. '.repeat(3) + '\n\n'
+      : '### Section ' + String.fromCharCode(65 + index / 2) + '\n\n');
+    for (const [id, className] of cases) {
+      const row = document.createElement('div'); row.className = 'row';
+      const preview = document.createElement('div'); preview.className = 'preview ' + className;
+      const target = document.createElement('span'); target.id = id; target.className = 'message';
+      target.title = pieces.join('');
+      target.append(...pieces.map(piece => document.createTextNode(piece)));
+      const pane = document.createElement('div'); pane.className = 'pane';
+      const cover = document.createElement('div'); cover.className = 'cover';
+      preview.append(target); row.append(preview, pane, cover); document.body.append(row);
+    }
+  });
+</script>
+<body></body>
+</html>

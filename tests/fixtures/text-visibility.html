@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Clipped newsletter label regression</title>
+<style>
+  html, body { background: #09204D; color: #AAAAAA; font: 14px/1.8 sans-serif; }
+  body { padding: 20px; }
+  label { display: block; }
+  .hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; color: #0A0A0A; }
+  .modern { clip-path: inset(50%); }
+  .legacy { clip: rect(0px, 0px, 0px, 0px); }
+  #partial { width: 300px; clip-path: inset(0 0 0 10%); }
+  #one-pixel { width: 1px; height: 1px; overflow: visible; }
+  #static-clip { position: static; clip: rect(0px, 0px, 0px, 0px); }
+  #offscreen { margin-top: 1600px; }
+  input { color: #FEFEFE; background: #09204D; font: inherit; }
+  input::placeholder { color: #AAAAAA; }
+</style>
+<body>
+<label id="modern" class="hidden modern" data-expected="hidden" for="email">Email Address</label>
+<div class="hidden modern"><label id="modern-child" data-expected="hidden">Hidden by parent</label></div>
+<label id="legacy" class="hidden legacy" data-expected="hidden">Legacy clipped label</label>
+<div class="hidden legacy"><label id="legacy-child" data-expected="hidden">Legacy clipped ancestor</label></div>
+<label id="visible" data-expected="visible">Visible gray label</label>
+<input id="email" type="email" placeholder="Email Address" value="">
+<label id="partial" data-expected="visible">Partially clipped visible text</label>
+<label id="one-pixel" data-expected="visible">Visible overflow</label>
+<label id="static-clip" data-expected="visible">Static clip does not apply</label>
+<div style="display: contents; clip-path: inset(50%)"><label id="contents-child" data-expected="visible">Boxless parent does not clip</label></div>
+<label id="offscreen" data-expected="visible">Normal text below the viewport</label>
+</body></html>

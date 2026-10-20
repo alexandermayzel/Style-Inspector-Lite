@@ -1,0 +1,40 @@
+{
+  "name": "style-inspector-lite",
+  "version": "1.0.1",
+  "private": true,
+  "description": "A local Firefox sidebar for CSS inspection and text contrast checks.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node internal/scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p internal/config/tsconfig.json",
+    "test": "node internal/scripts/test.mjs",
+    "test:ui": "node tests/e2e/sidebar.mjs && node tests/e2e/sidebar-behavior.mjs",
+    "test:contrast": "node tests/e2e/sidebar-contrast.mjs",
+    "test:source": "node tests/e2e/source-rebuild.mjs",
+    "prepare:release-docs": "node internal/scripts/release-docs.mjs",
+    "test:firefox": "node tests/e2e/firefox.mjs",
+    "lint:extension": "node internal/scripts/web-ext.mjs lint",
+    "start:firefox": "node internal/scripts/web-ext.mjs run",
+    "package": "node internal/scripts/package.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run lint:extension"
+  },
+  "devDependencies": {
+    "@tailwindcss/node": "4.3.3",
+    "@types/firefox-webext-browser": "143.0.1",
+    "@types/node": "26.6.5",
+    "esbuild": "0.28.2",
+    "fflate": "0.8.3",
+    "playwright": "1.64.1",
+    "sass": "1.105.2",
+    "selenium-webdriver": "4.51.0",
+    "sharp": "0.35.5",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "web-ext": "10.8.0"
+  },
+  "license": "MPL-2.0"
+}

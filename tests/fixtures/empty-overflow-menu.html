@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Empty overflow clips and visible descendants</title>
+<style>
+  html, body { margin: 0; color: #111; background: #FFF; font: 16px/24px Arial, sans-serif; }
+  body { padding: 24px 24px 100px; }
+  .cases { display: grid; grid-template-columns: repeat(auto-fit, 210px); gap: 12px; }
+  .case { position: relative; width: 210px; min-height: 82px; }
+  .clip { width: 190px; height: 0; overflow: hidden; }
+  .heading { padding: 8px; border-bottom: 1px solid #CCC; font-size: 16px; font-weight: 600; line-height: 24px; }
+  .heading svg { width: 16px; height: 16px; vertical-align: middle; }
+  .quoted { font-family: "Synthetic, Unavailable Family", Arial, sans-serif; font-synthesis: none; }
+  .border-only { border: 3px solid #555; }
+  .zero-width { width: 0; height: 40px; border: 3px solid #555; }
+  .zero-width > div { width: 180px; white-space: nowrap; }
+  .fractional { height: .5px; }
+  .quarter { height: .25px; }
+  .fractional > div { position: relative; top: -8px; }
+  .padding-area { padding: 8px 0; }
+  .padding-area > div { position: relative; top: -12px; }
+  .contents { display: contents; }
+  .visible-overflow { overflow: visible; }
+  .absolute { position: absolute; top: 8px; left: 0; }
+  .relative { position: relative; }
+  .fixed { position: fixed; left: 24px; top: 690px; background: #FFF; }
+  .fixed-contained { transform: translateZ(0); }
+  .fixed-contained .fixed { left: 0; top: 0; }
+  .expanded-clip { overflow: clip; overflow-clip-margin: 24px; }
+  .own-clip { width: 190px; height: 0; overflow: hidden; }
+  .legend-clip { width: 0; min-width: 0; height: 100px; padding: 0; border: 0; margin: 0; overflow: hidden; }
+  .legend-clip legend { white-space: nowrap; }
+  .top-layer { margin: 0; inset: 540px auto auto 24px; padding: 8px; border: 1px solid #555; color: #111; background: #FFF; }
+  .top-layer::backdrop { background: transparent; }
+  #toggle { position: absolute; right: 0; top: 52px; width: 28px; height: 26px; padding: 0; }
+  #toggle svg { width: 16px; height: 16px; }
+</style>
+
+<!-- Synthetic text only. IDs provide stable targets without adding test labels
+     to the audited DOM. No web fonts, network resources or page-specific markup. -->
+<div class="cases">
+  <!-- Closed menu headings have positive layout rectangles but no painted area.
+       The quoted fallback family must not prevent proving an empty clip. -->
+  <section class="case">
+    <button id="toggle" type="button" aria-label="Toggle example menu" aria-controls="closed-menu" aria-expanded="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor"/></svg></button>
+    <div id="closed-menu" class="clip" inert>
+      <div id="closed-heading" class="heading">Example articles<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor"/></svg></div>
+      <div id="closed-quoted-heading" class="heading quoted">Example sections<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor"/></svg></div>
+      <div id="closed-third-heading" class="heading">Example information</div>
+    </div>
+  </section>
+  <section class="case"><div class="clip border-only"><div id="border-only-text" class="heading quoted">Empty inside borders</div></div></section>
+  <section class="case"><div class="clip zero-width"><div id="zero-width-text">Empty horizontal clip</div></div></section>
+
+  <!-- Inert suppresses interaction, not paint. Positive fractional and padding
+       areas must survive a zero-area shortcut, even when only part is painted. -->
+  <section class="case"><div inert><div id="visible-inert-text" class="heading">Visible inactive region</div></div></section>
+  <section class="case"><div class="clip fractional"><div id="fractional-text">Fractional visible strip</div></div></section>
+  <section class="case"><div class="clip fractional quarter"><div id="quarter-text">Smaller visible strip</div></div></section>
+  <section class="case"><div class="clip padding-area"><div id="padding-text">Visible padding area</div></div></section>
+  <section class="case"><div class="clip contents"><div id="contents-text">Visible contents child</div></div></section>
+  <section class="case"><div class="clip visible-overflow"><div id="visible-overflow-text">Visible overflow text</div></div></section>
+
+  <!-- Absolute descendants can escape a static overflow ancestor when their
+       containing block is outside it. Relative/transform variants bind them. -->
+  <section class="case"><div class="clip"><div id="absolute-escape-text" class="absolute">Escaping absolute text</div></div></section>
+  <section class="case"><div class="clip relative"><div id="absolute-contained-text" class="absolute">Clipped absolute text</div></div></section>
+  <section class="case"><div class="clip"><div id="fixed-escape-text" class="fixed">Escaping fixed text</div></div></section>
+  <section class="case"><div class="clip fixed-contained"><div id="fixed-contained-text" class="fixed">Clipped fixed text</div></div></section>
+  <section class="case"><div class="clip expanded-clip"><div id="clip-margin-text">Visible expanded clip</div></div></section>
+  <section class="case"><div id="own-empty-text" class="own-clip quoted">Text in its own empty clip</div></section>
+  <!-- A fieldset's first legend paints through a special border-area box and
+       can remain visible beyond the fieldset's zero-width content clip. -->
+  <section class="case"><fieldset class="legend-clip"><legend id="fieldset-legend-text">Visible fieldset legend</legend></fieldset></section>
+
+  <!-- Top-layer cases start closed to keep the baseline deterministic. Tests
+       may call showPopover() / showModal() on one target, then close it again.
+       A top-layer descendant escapes the zero-height clipping ancestor. -->
+  <section class="case"><div class="clip"><div id="escape-popover" class="top-layer" popover="manual">Visible top-layer popover</div></div></section>
+  <section class="case"><div class="clip"><dialog id="escape-dialog" class="top-layer">Visible top-layer dialog</dialog></div></section>
+</div>
+<script>
+  document.querySelector('#toggle').addEventListener('click', () => {
+    const button = document.querySelector('#toggle');
+    const menu = document.querySelector('#closed-menu');
+    const expanded = button.getAttribute('aria-expanded') !== 'true';
+    button.setAttribute('aria-expanded', String(expanded));
+    menu.inert = !expanded;
+    menu.style.height = expanded ? 'auto' : '0px';
+  });
+</script>
+</html>
