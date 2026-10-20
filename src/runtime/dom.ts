@@ -1,4 +1,5 @@
 import { parseColor, resolveBackground } from '../core/colors';
+import { documentCanvasColor } from './document-canvas';
 import { evaluateContrast, evaluateFontSize } from '../core/contrast';
 import { compositeGradientRange, parseLinearGradient, splitBackgroundLayers } from '../core/gradients';
 import type { GradientBackgroundLayer } from '../core/gradients';
@@ -293,7 +294,15 @@ function paintingConditions(element: Element, geometry: readonly TextRunGeometry
   const ownStyle = getComputedStyle(element);
   const own = parseColor(ownStyle.backgroundColor);
   let backgroundVisible = true;
+  let reachedDocumentRoot = false;
+  let knownCanvasPath = true;
   for (let current: Element | null = element; current; current = current.parentElement) {
+    if (current === element.ownerDocument?.documentElement) reachedDocumentRoot = true;
+    // Light-DOM ancestors cannot establish a shadow surface or a top-layer
+    // backdrop between this text and the document canvas.
+    if (current.assignedSlot || current.shadowRoot
+      || (current as Element & { readonly openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot
+      || inTopLayer(current)) knownCanvasPath = false;
     const style = getComputedStyle(current);
     // display:contents has no box to paint its declared background. Its
     // children still inherit text styles and may paint generated pseudo boxes.
@@ -337,6 +346,14 @@ function paintingConditions(element: Element, geometry: readonly TextRunGeometry
         if (pseudos.length < 64) pseudos.push({ owner: current, pseudo, style: pseudoStyle });
         else reasons.add('pseudo-element');
       }
+    }
+  }
+  if (backgroundVisible && reachedDocumentRoot && knownCanvasPath) {
+    const canvas = documentCanvasColor(element.ownerDocument, registerOwnElement);
+    if (canvas) {
+      layers.push(canvas);
+      if (gradientLayers.length < 300) gradientLayers.push({ color: canvas, gradients: [] });
+      else gradientLayersLimited = true;
     }
   }
   const backgroundRange = hasGradient && !unsupportedImage && !gradientLayersLimited ? compositeGradientRange(gradientLayers) ?? undefined : undefined;

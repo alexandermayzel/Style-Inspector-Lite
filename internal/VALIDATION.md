@@ -6,6 +6,35 @@ to this local implementation; subsequent runtime changes require relevant checks
 again. This record is not Mozilla review, signing,
 publication, or a complete accessibility assessment.
 
+The transparent-document follow-up resolves the browser's document canvas color
+when the CSS background chain reaches the top-level HTML root without an opaque
+surface. A short-lived, hidden CSS `Canvas` probe uses the root's color scheme;
+it does not assume white or use an element's local scheme. Same-batch reuse
+avoids a probe for each text run, and later measurements refresh browser colors.
+Owned probe mutations do not invalidate the audit. Unknown shadow surfaces and
+top-layer backdrops remain unresolved, and existing image/effect/overlap checks
+remain in force.
+
+All 263 unit/integration tests, type checking, build and extension lint pass
+(zero lint errors, warnings or notices). The complete sidebar/DOM harness passes.
+Eight additional browser groups pass on Firefox 142, Firefox 158 and Edge 155,
+using the built content script and a controlled messaging harness. They compare
+the measured canvas with independent screenshot pixels, including root light/dark
+schemes, an opposing local scheme, alpha composition, gradients, explicit paint,
+custom Firefox colors, forced colors, uncertain overlays, slotted text and
+transparent modal/popover backdrops. They also verify audit/inspection agreement,
+probe cleanup and audit freshness. The reconstructed black-on-white navigation
+returns 21:1 in both audit and inspection.
+An isolated offline source rebuild produces all 15 runtime files byte-identically.
+
+Kickstarter's supplied export has opaque black text, a transparent CSS background
+and `unresolved-background`. Its live page blocked automated access, so these
+checks establish the general missing-canvas correction, not that every one of
+the reported 289 entries has the same cause. The corrected build is included in
+the initial 1.0.1 handoff; preceding artifacts are preserved locally. Earlier
+validation below records preceding changes and is not a claim that every older
+check was repeated for this update.
+
 The final edge-case review corrects backgrounds declared on boxless
 `display: contents` elements and measures the actual supported glyph fill,
 including inherited `-webkit-text-fill-color`. Native tests prove the previous
@@ -1413,6 +1442,7 @@ npm run build
 npm run lint:extension
 npm run test:ui
 npm run test:contrast
+npm run test:canvas
 npm run test:firefox
 npm run test:source
 ```
@@ -1440,6 +1470,11 @@ profile. Set `FIREFOX_BINARY` and `GECKODRIVER` to select the executable paths.
 The test enables geckodriver's `--allow-system-access` only for that test session.
 Run separately with the declared minimum and current Firefox versions; preserve
 their individual JSON result files. Installing a test binary alone is not a test.
+
+`npm run test:canvas` runs the document-canvas fixture in Edge. Add `-- --firefox`
+to run the same assertions in native Firefox with `FIREFOX_BINARY` and
+`GECKODRIVER`. It uses a controlled message bridge for the built content script,
+not an installed extension, and writes a browser-specific result file.
 
 `npm run test:source -- --offline --cache /absolute/npm-cache` reuses a populated
 npm cache without registry access. Omitting `--offline` permits npm's ordinary
@@ -1491,8 +1526,10 @@ transparent displacement or uncertain geometry; they do not resolve arbitrary
 sibling surfaces.
 
 Simple sRGB alpha composition and transparent ancestor background chains are
-supported when they resolve to a known opaque background. An unresolved canvas
-is not assumed white. Simple linear gradients with legacy sRGB colors or explicit
+supported when they resolve to a known opaque background. A complete supported
+chain can use the browser's document canvas color, resolved with the HTML root's
+color scheme. Unknown shadow surfaces or top-layer backdrops prevent this
+fallback; an unresolved canvas is not assumed white. Simple linear gradients with legacy sRGB colors or explicit
 `in srgb` interpolation can establish a conservative minimum contrast for opaque
 text. Bounds include every supported stop, intermediate color and uncovered base;
 they do not locate individual colors behind the text. AA/AAA pass only when their

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Text over the browser's document canvas</title>
+<style>
+  html { color-scheme: normal; }
+  body { margin: 24px; font: 16px/24px Arial, sans-serif; color: #000; }
+  nav { display: flex; gap: 24px; }
+  a { color: inherit; }
+  section { margin-top: 24px; }
+  .surface { display: inline-block; padding: 8px; }
+  .alpha { background: rgb(0 0 0 / 50%); color: #fff; }
+  .gradient { background: linear-gradient(in srgb, rgb(255 255 255 / 50%), rgb(230 230 230 / 50%)); }
+  .explicit { background: #fff; color: #000; }
+  .local-dark { color-scheme: dark; }
+  .system { color: CanvasText; }
+  .contents { display: contents; background: #000; }
+  .covered { position: relative; display: inline-block; }
+  .cover { position: absolute; inset: 0; background: #777; }
+  .image { background-image: url("missing-canvas-test-image.png"); }
+</style>
+<nav aria-label="Categories">
+  <a href="#art"><span id="art">Art</span></a>
+  <a href="#comics"><span id="comics">Comics</span></a>
+</nav>
+<section><span id="system" class="system">Browser text color</span></section>
+<section><span id="local-dark" class="local-dark">A local scheme does not change the document canvas</span></section>
+<section><span id="alpha" class="surface alpha">Translucent surface</span></section>
+<section><span id="gradient" class="surface gradient">Translucent gradient</span></section>
+<section><span id="explicit" class="surface explicit">Explicit white surface</span></section>
+<section><div class="contents"><span id="contents">A boxless background does not paint</span></div></section>
+<section><div class="covered"><span id="covered">A real covering surface stays unassessed</span><div class="cover"></div></div></section>
+<section><span id="image" class="surface image">An image cannot be replaced by the browser canvas</span></section>
+</html>

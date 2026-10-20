@@ -13,6 +13,7 @@
     "test": "node internal/scripts/test.mjs",
     "test:ui": "node tests/e2e/sidebar.mjs && node tests/e2e/sidebar-behavior.mjs",
     "test:contrast": "node tests/e2e/sidebar-contrast.mjs",
+    "test:canvas": "node tests/e2e/document-canvas.mjs",
     "test:source": "node tests/e2e/source-rebuild.mjs",
     "prepare:release-docs": "node internal/scripts/release-docs.mjs",
     "test:firefox": "node tests/e2e/firefox.mjs",

@@ -19,23 +19,35 @@ const [runtimeHash, sourceHash] = await Promise.all([hash(runtimeFile), hash(sou
 const relative = file => path.relative(release, file).split(path.sep).join('/');
 const english = 'Initial release.\n';
 const german = 'Erstveröffentlichung.\n';
-const reviewer = `RELEASE
-Initial release ${version}. Native Firefox sidebar for CSS inspection and local text-contrast checks. Firefox Desktop ${manifest.browser_specific_settings.gecko.strict_min_version}+, English/German, MPL-2.0. No account or external service required.
+const reviewer = `Local CSS inspection and text-contrast checks in a native Firefox sidebar.
 
-BUILD
-Source upload: Yes. esbuild 0.28.2 transpiles TypeScript and bundles modules; sharp 0.35.5 generates icons. No minification, obfuscation or webpack. Tested environment: Windows x64 build 26100.9445, Node.js 22.23.3, npm 10.9.9. Extract the source ZIP; run npm ci, npm run typecheck, npm test, npm run build, npm run lint:extension. Output: ../Style-Inspector-Lite-artifacts/dist/. README.md and internal/RELEASING.md provide full instructions. No private files are needed.
+RELEASE
+Initial release ${version}. Firefox Desktop ${manifest.browser_specific_settings.gecko.strict_min_version}+; English/German; MPL-2.0. No account or external service required.
 
-PERMISSIONS AND DATA
-activeTab/scripting: explicit main-document inspection and highlights. menus: inspection entry. storage: local preferences and bounded session analysis. clipboardWrite: explicit copies. Optional downloads: Save file only. Optional HTTP/HTTPS access covers all websites and is requested by Check page/Check again when access is missing; it persists until revoked. Denial leaves toolbar/context-menu activation available. Navigation alone never injects or scans. No remote code, telemetry or data transmission; no webpage input values are read or exported. Confirmed selections show bounded ordinary text excerpts for troubleshooting; separate explicit copy only, excluded from storage, audits, hover previews and standard exports.
+SOURCE
+Source ZIP required: esbuild 0.28.2 transpiles TypeScript and bundles modules; sharp 0.35.5 generates icons. No minification, obfuscation or remote code.
+Tested with Node.js 22.23.3 and npm 10.9.9 on Windows x64. Extract the source ZIP; run npm ci, npm run typecheck, npm test, npm run build, npm run lint:extension. Output: ../Style-Inspector-Lite-artifacts/dist/. README.md and internal/RELEASING.md provide full instructions. No private files are needed.
+
+PERMISSIONS
+activeTab/scripting: explicit main-document inspection and highlights. menus: right-click inspection. storage: local preferences and bounded session analysis. clipboardWrite: explicit copies. Optional downloads: Save file only.
+Optional HTTP/HTTPS access covers all websites. Check page/Check again requests it when missing; access persists until revoked. Denial leaves toolbar/context-menu activation available. Navigation alone never injects or scans.
+
+DATA
+No telemetry or data transmission. Webpage input values and editable text are not read or exported. Confirmed selections show bounded ordinary text excerpts for troubleshooting, with separate explicit copying; excerpts are excluded from storage, audits, hover previews and standard exports.
 
 TESTING
-Open an ordinary webpage, click the toolbar icon, then choose an element or start an audit. Right-click inspection selects the clicked element. Without a selection, Contrast offers a local HEX/color-picker calculator with normal/large AA/AAA ratings. Check highlights, rescan, exports and permission denial/grant. Protected pages and embedded documents are excluded; uncertain page contrast stays unassessed. CSS-pair thresholds are labeled separately. The <12 CSS-pixel hint is not a WCAG minimum. See internal/VALIDATION.md for automated evidence and remaining manual checks. Mozilla review and signed-package checks are pending.
+Open an ordinary webpage, click the toolbar icon, then choose an element or start an audit. Right-click inspection selects the clicked element. Without a selection, Contrast offers a local HEX/color-picker calculator with normal/large AA/AAA ratings. Check highlights, rescan, exports and permission denial/grant.
+Protected pages and embedded documents are excluded. Uncertain page contrast stays unassessed; CSS-pair thresholds are labeled separately. The <12 CSS-pixel hint is not a WCAG minimum. Automated evidence and remaining manual checks: internal/VALIDATION.md.
 `;
 const fields = { 'amo-changelog.en.txt': english, 'amo-changelog.de.txt': german, 'amo-reviewer-comment.en.txt': reviewer };
 const counts = Object.fromEntries(Object.entries(fields).map(([name, value]) => [name, checkField(value, name)]));
 const submission = `# AMO submission — ${version} (initial release)
 
 Prepared for manual submission. Packages are unsigned; review and publication are pending.
+
+Start at [Submit a new add-on](https://addons.mozilla.org/developers/addon/submit/distribution).
+Use the two matching ZIPs below. Copy only the text inside each release-note or
+reviewer block into the corresponding AMO field.
 
 ## Submission settings
 
@@ -53,7 +65,8 @@ Prepared for manual submission. Packages are unsigned; review and publication ar
 | Additional source upload | **Yes** — TypeScript and bundled JavaScript |
 | Support email / website | Leave empty until public contact details are chosen |
 
-Stable extension ID: \`${manifest.browser_specific_settings.gecko.id}\`. No public AMO or source URL is assumed.
+Stable extension ID: \`${manifest.browser_specific_settings.gecko.id}\`.
+Source repository: [Style Inspector Lite](https://github.com/alexandermayzel/Style-Inspector-Lite).
 
 ## Upload files and listing text
 
