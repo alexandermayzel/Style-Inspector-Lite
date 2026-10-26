@@ -96,7 +96,7 @@ test('source archive excludes nested metadata, generated files and case-varied p
   try {
     const included = ['package.json', 'README.md', 'THIRD_PARTY_NOTICES.md', 'src/content.ts',
       'internal/scripts/build.mjs', 'internal/config/tsconfig.json', 'internal/RELEASING.md',
-      'internal/VALIDATION.md', 'tests/fixtures/page.html', 'tests/fixtures/export/README.md',
+      'internal/VALIDATION.md', 'internal/MEASUREMENT.md', 'tests/fixtures/page.html', 'tests/fixtures/export/README.md',
       'tests/fixtures/export/style-inspector-lite-element-all.tailwind.txt'];
     const excluded = ['internal/.git/config', 'internal/coverage/report.html', 'tests/test-results/trace.json',
       'src/node_modules/dependency/index.js', 'internal/.ENV.local', 'internal/MAINTAINER.override.MD',

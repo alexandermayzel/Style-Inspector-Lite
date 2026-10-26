@@ -8,7 +8,7 @@ export const buildDir = path.join(artifactsRoot, 'dist');
 
 const publicDocuments = new Set([
   'README.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md',
-  'internal/RELEASING.md', 'internal/VALIDATION.md', 'tests/fixtures/export/README.md'
+  'internal/RELEASING.md', 'internal/VALIDATION.md', 'internal/MEASUREMENT.md', 'tests/fixtures/export/README.md'
 ]);
 export function publicDocumentAllowed(name) {
   return publicDocuments.has(name);
