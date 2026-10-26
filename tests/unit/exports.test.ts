@@ -11,6 +11,99 @@ import type { ExportFormat, ExportSource } from '../../src/core/types';
 import { fixtureAudit, fixtureRun, fixtureSnapshot } from '../fixtures/export/data';
 
 const options = (format: ExportFormat) => ({ format, version: '1.0.0' });
+test('page token exports explicitly choose the measured overview or legacy element CSS without private references', () => {
+  const audit = fixtureAudit();
+  audit.palette = [parseColor('#000000')]; audit.fonts = ['Arial, sans-serif'];
+  audit.paletteUsage = [{ color: parseColor('#ff0000'), count: 1, roles: { text: 1 }, elementRefs: ['PRIVATE_REF'] }, { color: parseColor('#ffffff'), count: 1, roles: { background: 1 } }];
+  audit.fontUsage = [{ family: 'Georgia, serif', count: 1, sizes: [{ sizeCssPx: 16, count: 1 }], elementRefs: ['PRIVATE_REF'] }];
+  const before = structuredClone(audit), source = { kind: 'page-tokens' as const, audit };
+  const raw = JSON.parse(serializeExport(source, options('json')).text);
+  assert.deepEqual(raw.generatedTokens.map((token: { value: string }) => token.value), ['#000000', 'Arial, sans-serif']);
+  assert.equal(raw.inventory, undefined, 'Callers without an explicit basis keep the existing format');
+  for (const inventory of ['measured', 'css'] as const) for (const format of ['css', 'scss', 'json', 'tailwind'] as const) {
+    const output = serializeExport(source, { ...options(format), inventory });
+    assert.doesNotMatch(output.text, /PRIVATE_REF|elementRefs|textExcerpt/);
+    if (inventory === 'measured') { assert.match(output.text, /#FF0000/); assert.match(output.text, /#FFFFFF/); assert.match(output.text, /Georgia/); assert.doesNotMatch(output.text, /Arial/); }
+    else { assert.match(output.text, /#000000/); assert.match(output.text, /Arial/); assert.doesNotMatch(output.text, /Georgia/); }
+    if (format === 'json') assert.equal(JSON.parse(output.text).inventory, inventory);
+    else assert.match(output.text, inventory === 'measured' ? /Inventory: page overview/ : /Inventory: raw element CSS/);
+  }
+  assert.deepEqual(audit, before);
+  audit.fontUsage.push({ family: 'Unsafe; injected {}', count: 1, sizes: [] });
+  audit.paletteUsage.push({ color: { raw: 'unsafe', rgba: null }, count: 1, roles: {} });
+  const safe = serializeExport(source, { ...options('css'), inventory: 'measured' });
+  assert.doesNotMatch(safe.text, /injected/);
+  assert.deepEqual(safe.warnings.map(warning => warning.code).sort(), ['unsupported-font-family', 'unsupported-palette-color']);
+  assert.throws(() => serializeExport(source, { ...options('css'), inventory: 'unsupported' as 'css' }), /unsupported-export-inventory/);
+});
+test('exports retain bounded inventory and viewport scope metadata without unknown fields', () => {
+  const audit = fixtureAudit();
+  Object.assign(audit, { scope: 'viewport', scopeViewport: { left: 2, top: 50, width: 1200, height: 800, private: 'PRIVATE_SCOPE' },
+    inventoryLimits: { maxColors: 128, maxFontFamilies: 64, maxFontSizes: 1000, maxFontVariants: 1000, maxElements: 1000,
+      reached: ['colors', 'colors', 'font-variants', 'PRIVATE_LIMIT'], private: 'PRIVATE_FIELD' } });
+  for (const kind of ['audit', 'page-tokens'] as const) {
+    const output = serializeExport({ kind, audit }, options('json')), data = JSON.parse(output.text);
+    assert.deepEqual(data.metadata.scopeViewport, { left: 2, top: 50, width: 1200, height: 800 });
+    assert.deepEqual(data.metadata.inventoryLimits, { maxColors: 128, maxFontFamilies: 64, maxFontSizes: 1000, maxFontVariants: 1000, maxElements: 1000, reached: ['colors', 'font-variants'] });
+    assert.ok(output.warnings.some(item => item.code === 'partial-style-inventory'));
+    assert.doesNotMatch(output.text, /PRIVATE_/);
+  }
+  assert.match(serializeExport({ kind: 'page-tokens', audit }, options('css')).text, /partial-style-inventory/);
+  Object.assign(audit.inventoryLimits!, { maxColors: -1 }); Object.assign(audit.scopeViewport!, { top: NaN });
+  const invalid = JSON.parse(serializeExport({ kind: 'audit', audit }, options('json')).text);
+  assert.equal('inventoryLimits' in invalid.metadata, false); assert.equal('scopeViewport' in invalid.metadata, false);
+  const legacy = JSON.parse(serializeExport({ kind: 'audit', audit: fixtureAudit() }, options('json')).text);
+  assert.equal('inventoryLimits' in legacy.metadata, false); assert.equal('scopeViewport' in legacy.metadata, false);
+});
+test('non-JSON page-token exports identify the measured scope and completion state', () => {
+  const audit = fixtureAudit();
+  audit.rootElementRef = 'PRIVATE_SECTION_REF'; audit.status = 'partial';
+  for (const [scope, label] of [['page', 'whole page'], ['viewport', 'initial visible area'], ['selection', 'selected section']] as const) {
+    audit.scope = scope;
+    for (const format of ['css', 'scss', 'tailwind'] as const) {
+      const text = serializeExport({ kind: 'page-tokens', audit }, options(format)).text;
+      assert.ok(text.includes(`Audit scope: ${label}; audit status: partial.`));
+      assert.doesNotMatch(text, /PRIVATE_SECTION_REF|rootElementRef/);
+    }
+  }
+  assert.doesNotMatch(serializeExport({ kind: 'page-tokens', audit: fixtureAudit() }, options('css')).text, /Audit scope:/, 'Legacy results must not invent a measured scope');
+  Object.assign(audit, { scope: '*/ UNSAFE', status: '*/ UNSAFE' });
+  assert.doesNotMatch(serializeExport({ kind: 'page-tokens', audit }, options('css')).text, /UNSAFE/);
+});
+test('scoped audit and page-token reports retain completion metadata without private root references', () => {
+  const audit = fixtureAudit();
+  Object.assign(audit, { scope: 'selection', durationMs: 34.5, examined: 48,
+    limits: { maxRuns: 1000, maxElements: 20000 }, reachedLimits: ['text-runs'], rootElementRef: 'PRIVATE_SECTION_REF' });
+  for (const kind of ['audit', 'page-tokens'] as const) {
+    const result = serializeExport({ kind, audit }, options('json'));
+    const data = JSON.parse(result.text);
+    assert.equal(data.metadata.scope, 'selection');
+    assert.equal(data.metadata.durationMs, 34.5);
+    assert.equal(data.metadata.examined, 48);
+    assert.deepEqual(data.metadata.limits, { maxRuns: 1000, maxElements: 20000 });
+    assert.deepEqual(data.metadata.reachedLimits, ['text-runs']);
+    assert.doesNotMatch(result.text, /PRIVATE_SECTION_REF|rootElementRef/);
+  }
+  const legacy = JSON.parse(serializeExport({ kind: 'audit', audit: fixtureAudit() }, options('json')).text);
+  assert.equal('scope' in legacy.metadata, false, 'An old snapshot must not invent its scan scope or duration');
+  assert.equal('durationMs' in legacy.metadata, false);
+  Object.assign(audit, { scope: 'INVALID_SCOPE', durationMs: NaN, examined: -1,
+    limits: { maxRuns: -10, maxElements: Infinity }, reachedLimits: ['elements', 'elements', 'PRIVATE_REASON'] });
+  const invalid = serializeExport({ kind: 'audit', audit }, options('json'));
+  const metadata = JSON.parse(invalid.text).metadata;
+  assert.equal('scope' in metadata, false); assert.equal('durationMs' in metadata, false);
+  assert.equal('examined' in metadata, false); assert.equal('limits' in metadata, false);
+  assert.deepEqual(metadata.reachedLimits, ['elements']);
+  assert.doesNotMatch(invalid.text, /PRIVATE_|INVALID_SCOPE/);
+});
+test('audit JSON distinguishes a visible-fragment measurement without exposing fragment geometry', () => {
+  const audit = fixtureAudit(); audit.scope = 'viewport'; audit.runs[0]!.viewportPartial = true;
+  const parsed = JSON.parse(serializeExport({ kind: 'audit', audit }, options('json')).text);
+  assert.equal(parsed.textRuns[0].viewportPartial, true);
+  assert.equal('rects' in parsed.textRuns[0], false);
+  Object.assign(audit.runs[0]!, { viewportPartial: 'PRIVATE_SCOPE' });
+  assert.doesNotMatch(serializeExport({ kind: 'audit', audit }, options('json')).text, /PRIVATE_SCOPE|viewportPartial/);
+});
 test('explicit diagnostic text stays out of all standard export sources and formats', () => {
   const snapshot = fixtureSnapshot();
   snapshot.textExcerpt = { value: 'EXCERPT_ROOT_PRIVATE', truncated: false };

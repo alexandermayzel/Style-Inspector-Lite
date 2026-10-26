@@ -62,6 +62,45 @@ function coversPaddingInterior(element: Element, style: CSSStyleDeclaration, rec
 }
 
 /**
+ * Retain an explicitly authored ancestor color for an unverified CSS pair.
+ * Displaced offscreen text has no hit-test proof of its visible backdrop; this
+ * only establishes a fully covering CSS surface, without inferring canvas paint.
+ */
+export function enclosingCssBackground(element: Element, rect: Rect): RGBA | null {
+  if (![rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) || rect.width <= 0 || rect.height <= 0) return null;
+  const controls = ['IMG', 'VIDEO', 'AUDIO', 'CANVAS', 'IFRAME', 'OBJECT', 'EMBED', 'INPUT', 'TEXTAREA', 'SELECT', 'METER', 'PROGRESS'];
+  const parent = element.parentElement;
+  // A nearby control may supply a separate surface. If its narrow association
+  // was not proven by the caller, ancestor CSS is not a substitute for it.
+  if (parent) {
+    if (parent.children.length > 32) return null;
+    for (const child of parent.children) if (child !== element && controls.includes(child.tagName)) return null;
+  }
+  let background: RGBA | null = null, depth = 0;
+  for (let owner: Element | null = element; owner; owner = owner.parentElement) {
+    if (++depth > 64 || owner.namespaceURI !== namespace || owner.assignedSlot || owner.shadowRoot
+      || (owner as Element & { openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot
+      || ['DETAILS', 'FIELDSET'].includes(owner.tagName) || controls.includes(owner.tagName)) return null;
+    try { if (owner.matches(':modal, :popover-open, :fullscreen')) return null; }
+    catch { return null; }
+    const style = getComputedStyle(owner);
+    if (!simple(style, true)
+      || [style.backgroundImage, style.borderImageSource, style.boxShadow, style.textShadow, style.appearance].some(value => value !== 'none')
+      || !['none', 'normal'].includes(style.content)) return null;
+    // Boxless wrappers do not paint their declared colors. Outer compositing
+    // guards still apply after finding the first actual opaque CSS surface.
+    if (background || style.display === 'contents') continue;
+    const color = parseColor(style.backgroundColor).rgba;
+    if (!color) return null;
+    if (color.a === 0) continue;
+    if (color.a !== 1 || !['border-box', 'padding-box'].includes(style.backgroundClip)
+      || !coversPaddingInterior(owner, style, rect)) return null;
+    background = color;
+  }
+  return background;
+}
+
+/**
  * A hit-tested opaque ancestor hides lower hit-test layers. Prove coverage of
  * the whole original text fragment before ending the search below it. This
  * establishes no new color and never inspects editable/control contents.

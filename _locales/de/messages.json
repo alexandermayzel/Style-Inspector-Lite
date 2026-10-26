@@ -1,4 +1,63 @@
 {
+  "reason_measurement_complexity_limit": {"message":"Das Element ist zu tief verschachtelt, um innerhalb der Messgrenze jede Darstellungsebene zuverlässig zu prüfen."},
+  "auditScope": {"message":"Umfang der nächsten Prüfung"},
+  "auditScopePage": {"message":"Gesamte Seite"},
+  "auditScopeViewport": {"message":"Sichtbarer Bereich"},
+  "auditScopeSelection": {"message":"Ausgewählter Abschnitt"},
+  "auditScopePageInfo": {"message":"Dargestellte Texte im Hauptdokument prüfen, auch außerhalb des sichtbaren Bereichs."},
+  "auditScopeViewportInfo": {"message":"Textbereiche prüfen, die beim Start im sichtbaren Ausschnitt liegen. Die Seite wird dabei nicht gescrollt."},
+  "auditScopeSelectionInfo": {"message":"Das ausgewählte Element mit seinen Unterelementen prüfen. Erneutes Prüfen verwendet diesen Abschnitt, bis du einen anderen auswählst."},
+  "auditScopeSelectionHelp": {"message":"Wähle zuerst ein Element, um nur diesen Abschnitt zu prüfen. Die Umfangsauswahl startet keine Prüfung."},
+  "auditScopeMeasured": {"message":"Geprüfter Umfang: $value$","placeholders":{"value":{"content":"$1"}}},
+  "auditDuration": {"message":"Prüfdauer: $value$ s","placeholders":{"value":{"content":"$1"}}},
+  "auditLimits": {"message":"Grenzen: $runs$ Textbereiche oder $elements$ besuchte Elemente pro Prüfung.","placeholders":{"runs":{"content":"$1"},"elements":{"content":"$2"}}},
+  "auditExamined": {"message":"Besuchte Elemente: $value$","placeholders":{"value":{"content":"$1"}}},
+  "auditLimitsReached": {"message":"Teilprüfung — erreicht: $value$.","placeholders":{"value":{"content":"$1"}}},
+  "auditLimitRuns": {"message":"Textbereichsgrenze"},
+  "auditLimitElements": {"message":"Elementgrenze"},
+  "auditLimitComplexity": {"message":"Komplexitätsgrenze der Messung"},
+  "auditMissingReason": {"message":"Fehlende Messwerte nach Ursache filtern"},
+  "auditAllReasons": {"message":"Alle Ursachen ($value$)","placeholders":{"value":{"content":"$1"}}},
+  "auditReasonMatches": {"message":"$shown$ von $total$ Einträgen ohne Messwert werden angezeigt. Die Gesamtzahlen bleiben unverändert.","placeholders":{"shown":{"content":"$1"},"total":{"content":"$2"}}},
+  "fontMoreSizes": {"message":"Weitere Größen ($value$ verbleibend)","placeholders":{"value":{"content":"$1"}}},
+  "fontMoreVariants": {"message":"Weitere Varianten ($value$ verbleibend)","placeholders":{"value":{"content":"$1"}}},
+  "fontMoreFamilies": {"message":"Weitere Schriftarten ($value$ verbleibend)","placeholders":{"value":{"content":"$1"}}},
+  "fontMoreFor": {"message":"Mehr anzeigen: $kind$ — $family$","placeholders":{"kind":{"content":"$1"},"family":{"content":"$2"}}},
+  "auditComparisonTitle": {"message":"Audit und Einzelmessung vergleichen"},
+  "auditComparisonChanged": {"message":"Einzelmessung weicht vom Audit ab"},
+  "auditComparisonOriginal": {"message":"Ursprünglicher Audit"},
+  "auditComparisonSelection": {"message":"Einzelmessung"},
+  "auditViewportPartial": {"message":"Die Prüfung des sichtbaren Bereichs hat nur die sichtbaren Teile dieses Textbereichs gemessen. „Untersuchen“ misst den vollständigen Textbereich; dadurch kann die Hintergrundbewertung abweichen."},
+  "auditComparisonHelp": {"message":"Beide Einträge betreffen denselben Textbereich zu unterschiedlichen Messzeitpunkten. Seitenänderungen, Scrollen oder Hover-Effekte können das Ergebnis verändern. Bei CSS-Farbpaaren bleibt die Seitendarstellung ungeprüft. Der Audit und seine Gesamtzahlen bleiben bis zur erneuten Prüfung unverändert."},
+  "inventoryOccurrences": {"message":"Vorkommen","description":"Style Inspector Lite: inventoryOccurrences"},
+  "inventoryShowOccurrences": {"message":"Vorkommen anzeigen","description":"Style Inspector Lite: inventoryShowOccurrences"},
+  "inventoryShowOccurrencesFor": {"message":"Vorkommen von $value$ anzeigen","description":"Style Inspector Lite: inventoryShowOccurrencesFor","placeholders":{"value":{"content":"$1"}}},
+  "inventoryOccurrenceCount": {"message":"$value$ geprüfte Elemente","description":"Style Inspector Lite: inventoryOccurrenceCount","placeholders":{"value":{"content":"$1"}}},
+  "inventoryReturnOccurrences": {"message":"Zurück zu den Vorkommen","description":"Style Inspector Lite: inventoryReturnOccurrences"},
+  "inventoryActionsHint": {"message":"Wähle ein Vorkommen zum Anzeigen oder Untersuchen.","description":"Style Inspector Lite: inventoryActionsHint"},
+  "inventoryColorActions": {"message":"Aktionen","description":"Style Inspector Lite: inventoryColorActions"},
+  "auditGroupResults": {"message":"Gleiche Ergebnisse gruppieren","description":"Style Inspector Lite: auditGroupResults"},
+  "auditGroupResultsHelp": {"message":"Textbereiche mit gleichen Farben, Messwerten und Messgrenzen zusammenfassen. Die Gesamtzahlen bleiben unverändert.","description":"Style Inspector Lite: auditGroupResultsHelp"},
+  "auditGroupCount": {"message":"$value$ Textbereiche mit gleichem Ergebnis","description":"Style Inspector Lite: auditGroupCount","placeholders":{"value":{"content":"$1"}}},
+  "paletteUseText": {"message":"Als Textfarbe","description":"Style Inspector Lite: paletteUseText"},
+  "paletteUseBackground": {"message":"Als Hintergrund","description":"Style Inspector Lite: paletteUseBackground"},
+  "manualPaletteScope": {"message":"Diese Farbe unverändert im lokalen Kontrastrechner verwenden.","description":"Style Inspector Lite: manualPaletteScope"},
+  "manualReturnPalette": {"message":"Zurück zur Palette","description":"Style Inspector Lite: manualReturnPalette"},
+  "manualUnderlay": {"message":"Fläche hinter dem Hintergrund","description":"Style Inspector Lite: manualUnderlay"},
+  "manualUnderlayHelp": {"message":"Ein transparenter Hintergrund benötigt eine deckende Fläche darunter. Gib deren Farbe ausdrücklich an.","description":"Style Inspector Lite: manualUnderlayHelp"},
+  "manualPickerOpaque": {"message":"Die Farbauswahl setzt eine deckende Farbe. Für Transparenz HEX mit Alpha oder RGB eingeben.","description":"Style Inspector Lite: manualPickerOpaque"},
+  "fontVariants": {"message":"Schriftgewicht und Zeilenhöhe","description":"Style Inspector Lite: fontVariants"},
+  "fontSort": {"message":"Größen und Varianten sortieren","description":"Local typography display order; font families remain ordered by usage."},
+  "fontSortFrequency": {"message":"Häufigste zuerst","description":"Sort observed font sizes and variants by occurrence count."},
+  "fontSortSizeAsc": {"message":"Schriftgröße: kleinste zuerst","description":"Sort observed CSS font sizes numerically in ascending order."},
+  "fontSortSizeDesc": {"message":"Schriftgröße: größte zuerst","description":"Sort observed CSS font sizes numerically in descending order."},
+  "fontWeightUnknown": {"message":"Gewicht unbekannt","description":"Style Inspector Lite: fontWeightUnknown"},
+  "fontWeightValue": {"message":"Gewicht $value$","description":"Style Inspector Lite: fontWeightValue","placeholders":{"value":{"content":"$1"}}},
+  "fontLineHeightUnknown": {"message":"Zeilenhöhe unbekannt","description":"Style Inspector Lite: fontLineHeightUnknown"},
+  "fontLineHeightValue": {"message":"Zeilenhöhe $value$","description":"Style Inspector Lite: fontLineHeightValue","placeholders":{"value":{"content":"$1"}}},
+  "fontLineHeightNormal": {"message":"normal (Browserstandard)","description":"Style Inspector Lite: fontLineHeightNormal"},
+  "actionCopyDiagnostic": {"message":"Diagnosedaten kopieren","description":"Style Inspector Lite: actionCopyDiagnostic"},
+  "diagnosticPrivacy": {"message":"Aktuelles Layout und berechnete Styles lokal lesen. Ohne Seitentext, HTML, URLs oder Formularwerte.","description":"Style Inspector Lite: diagnosticPrivacy"},
   "textAreaUnavailable": {
     "message": "Der zuvor gewählte Textbereich ist in dieser Messung nicht mehr verfügbar. Wähle einen anderen Bereich ausdrücklich aus.",
     "description": "Prevents silently substituting another text area's contrast after a new measurement."
@@ -29,9 +88,9 @@
   "manualValue": { "message": "Helligkeit", "description": "HSV brightness slider in percent." },
   "manualBackground": { "message": "Hintergrundfarbe", "description": "Background color entered into the manual calculator." },
   "manualContrastTitle": { "message": "Manueller Kontrasttest", "description": "Local contrast calculator without a selected page element." },
-  "manualContrastScope": { "message": "Eingegebene Farben, keine Messung der Webseite. Vergleiche hier deckende Text- und Hintergrundfarben.", "description": "Separates manually entered colors from inspected page measurements." },
-  "manualHexHint": { "message": "HEX: #RGB oder #RRGGBB", "description": "Supported opaque HEX formats for manual contrast input." },
-  "manualHexError": { "message": "Gib #RGB oder #RRGGBB ein. Transparenz und andere Formate werden nicht unterstützt.", "description": "Accessible validation error for manual HEX input." },
+  "manualContrastScope": { "message": "Eingegebene Farben, keine Messung der Webseite. Vergleiche hier Text- und Hintergrundfarben.", "description": "Separates manually entered colors from inspected page measurements." },
+  "manualHexHint": { "message": "HEX (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) oder RGB/RGBA.", "description": "Supported manual color input formats." },
+  "manualHexError": { "message": "Gib eine gültige HEX- oder RGB/RGBA-Farbe ein. Die darunterliegende Fläche muss deckend sein.", "description": "Accessible validation error for manual color input." },
   "manualPickColor": { "message": "$value1$ wählen", "description": "Accessible label for the inline manual color palette.", "placeholders": { "value1": { "content": "$1" } } },
   "manualLargeTextHelp": { "message": "Großer Text: mindestens 24 CSS-px oder 14 pt bei Schriftstärke 700 oder höher.", "description": "Explains the large-text category of the manual comparison." },
   "manualCopyReport": { "message": "Manuellen Farbvergleich kopieren", "description": "Footer copy action for the local contrast calculator." },
@@ -175,6 +234,10 @@
   "reason_filter": {
     "message": "Ein CSS-Filter verändert die dargestellten Farben.",
     "description": "Style Inspector Lite: reason_filter"
+  },
+  "reason_mask": {
+    "message": "Eine CSS-Maske kann Teile des Textes ausblenden oder verblassen lassen. Der sichtbare Kontrast muss manuell geprüft werden.",
+    "description": "Style Inspector Lite: reason_mask"
   },
   "reason_blend_mode": {
     "message": "Ein Mischmodus verändert die zusammengesetzten Farben.",
@@ -891,6 +954,22 @@
     "message": "Erfasste CSS-Schriftfamilien",
     "description": "Style Inspector Lite: pageFonts"
   },
+  "paletteSort": { "message": "Farben sortieren", "description": "Local page-palette display order, not a stored preference." },
+  "paletteSortUsage": { "message": "Nach Verwendung", "description": "Group colors by their observed role." },
+  "paletteSortFrequency": { "message": "Nach Häufigkeit", "description": "Most frequently observed colors first." },
+  "paletteSortHue": { "message": "Nach Farbton", "description": "Arrange colors by hue." },
+  "paletteRoleBackground": { "message": "Hintergründe", "description": "Colors used behind audited text." },
+  "paletteRoleText": { "message": "Text", "description": "Ordinary text colors in the page palette." },
+  "paletteRoleAccent": { "message": "Akzente", "description": "Observed link or control text colors, not inferred brand colors." },
+  "paletteRoleOther": { "message": "Weitere Farben", "description": "Remaining colors, including fully transparent values." },
+  "paletteUsageHelp": { "message": "Die Anzahl zählt geprüfte Textelemente, keine Flächengrößen. Textfarben von Links und Bedienelementen gelten als Akzente. Eine Farbe kann mehrere Verwendungen haben und erscheint einmal.", "description": "Explains the palette's frequency and role heuristic." },
+  "inventoryFrequency": { "message": "$value1$×", "description": "Compact count of audited text elements.", "placeholders": { "value1": { "content": "$1" } } },
+  "inventoryElementCount": { "message": "Geprüfte Textelemente: $value1$", "description": "Accessible expansion of the compact usage count.", "placeholders": { "value1": { "content": "$1" } } },
+  "inventoryRefreshHint": { "message": "Erneut prüfen, um Angaben zur Verwendung und Schriftgröße zu erfassen.", "description": "Older audit snapshots lack inventory metadata." },
+  "fontUsageHelp": { "message": "Häufig verwendete CSS-Schriftlisten stehen zuerst. Die Anzahl zählt geprüfte Textelemente; jede erfasste Größe steht einzeln in CSS-Pixeln.", "description": "Font overview ordering, counting unit and size unit." },
+  "fontObservedSizes": { "message": "Erfasste Schriftgrößen", "description": "Accessible label for each font family's list of measured CSS sizes." },
+  "fontCssSize": { "message": "$value1$ CSS px", "description": "Observed CSS font size.", "placeholders": { "value1": { "content": "$1" } } },
+  "fontSizeUnknown": { "message": "Größe nicht verfügbar", "description": "A recorded font family has an unresolved CSS size." },
   "pageOverview": {
     "message": "Seitenübersicht",
     "description": "Separates audit-wide colors and fonts from the selected element."
@@ -1095,6 +1174,14 @@
     "message": "Ein Element direkt über einen Rechtsklick untersuchen.",
     "description": "Style Inspector Lite: contextMenuDescription"
   },
+  "showDiagnostics": {
+    "message": "Diagnose-Button anzeigen",
+    "description": "Style Inspector Lite: showDiagnostics"
+  },
+  "showDiagnosticsDescription": {
+    "message": "„Diagnosedaten kopieren“ zur Fehlersuche im Seiten-Audit und beim Untersuchen einblenden. Daten werden erst beim Anklicken gelesen.",
+    "description": "Style Inspector Lite: showDiagnosticsDescription"
+  },
   "dataManagement": {
     "message": "Datenverwaltung",
     "description": "Style Inspector Lite: dataManagement"
@@ -1112,7 +1199,7 @@
     "description": "Style Inspector Lite: resetSettings"
   },
   "resetSettingsDescription": {
-    "message": "Diese fünf Vorgaben zurücksetzen. Analysedaten, Firefox-Tastenkürzel und erteilte Berechtigungen bleiben erhalten.",
+    "message": "Diese Einstellungen zurücksetzen. Analysedaten, Firefox-Tastenkürzel und erteilte Berechtigungen bleiben erhalten.",
     "description": "Style Inspector Lite: resetSettingsDescription"
   },
   "confirmClear": {
@@ -1120,7 +1207,7 @@
     "description": "Style Inspector Lite: confirmClear"
   },
   "confirmReset": {
-    "message": "Die fünf Vorgaben zurücksetzen?",
+    "message": "Die Einstellungen zurücksetzen?",
     "description": "Style Inspector Lite: confirmReset"
   },
   "shortcut": {
@@ -1211,6 +1298,10 @@
   "exportPreview": {
     "message": "Exakte Dateivorschau",
     "description": "Style Inspector Lite: exportPreview"
+  },
+  "exportPreviewTruncated": {
+    "message": "Bei großen Exporten wird die Vorschau gekürzt. Kopieren und Speichern enthalten die vollständige Datei.",
+    "description": "Style Inspector Lite: exportPreviewTruncated"
   },
   "exportGenerated": {
     "message": "Aus gemessenen Styles erzeugt. Enthält nur unterstützte Eigenschaften des gemessenen Zustands.",
@@ -1376,8 +1467,300 @@
     "message": "Regeln",
     "description": "Style Inspector Lite: rules"
   },
+  "auditStartPreserve": {
+    "message": "Neue Prüfung wird gestartet. Die bisherigen Ergebnisse bleiben erhalten, bis die Seite den Start bestätigt.",
+    "description": "Style Inspector Lite: auditStartPreserve"
+  },
+  "comparisonTitle": {
+    "message": "Mit vorheriger Prüfung vergleichen",
+    "description": "Style Inspector Lite: comparisonTitle"
+  },
+  "comparisonFirstAudit": {
+    "message": "Führe eine weitere manuelle Prüfung dieser Seite aus, um die Ergebnisse zu vergleichen.",
+    "description": "Style Inspector Lite: comparisonFirstAudit"
+  },
+  "comparisonTimes": {
+    "message": "Vorher: $value1$ · Jetzt: $value2$",
+    "description": "Style Inspector Lite: comparisonTimes",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      }
+    }
+  },
+  "comparisonScope": {
+    "message": "$value1$ · $value2$ CSS px · Kontrastziel $value3$",
+    "description": "Style Inspector Lite: comparisonScope",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      },
+      "value3": {
+        "content": "$3"
+      }
+    }
+  },
+  "comparisonHelp": {
+    "message": "Gezählt werden Kontrast- und Schriftgrößenbefunde, keine Elemente. „Neu“ bedeutet erstmals erfasst. Fehlende oder nicht bewertbare Texte gelten nicht als behoben.",
+    "description": "Style Inspector Lite: comparisonHelp"
+  },
+  "comparisonNew": {
+    "message": "Neu",
+    "description": "Style Inspector Lite: comparisonNew"
+  },
+  "comparisonResolved": {
+    "message": "Behoben",
+    "description": "Style Inspector Lite: comparisonResolved"
+  },
+  "comparisonPersistent": {
+    "message": "Weiterhin vorhanden",
+    "description": "Style Inspector Lite: comparisonPersistent"
+  },
+  "comparisonUnassessed": {
+    "message": "Nicht vergleichbar",
+    "description": "Style Inspector Lite: comparisonUnassessed"
+  },
+  "comparisonUnavailable_incomplete": {
+    "message": "Für einen Vergleich müssen beide Prüfungen vollständig sein.",
+    "description": "Style Inspector Lite: comparisonUnavailable_incomplete"
+  },
+  "comparisonUnavailable_stale_current": {
+    "message": "Die aktuelle Prüfung ist veraltet. Prüfe die Seite erneut für einen Vergleich.",
+    "description": "Style Inspector Lite: comparisonUnavailable_stale_current"
+  },
+  "comparisonUnavailable_document": {
+    "message": "Diese Prüfungen gehören zu unterschiedlichen Seitendokumenten.",
+    "description": "Style Inspector Lite: comparisonUnavailable_document"
+  },
+  "comparisonUnavailable_scope": {
+    "message": "Der Prüfumfang unterscheidet sich. Nutze für beide Prüfungen denselben Umfang.",
+    "description": "Style Inspector Lite: comparisonUnavailable_scope"
+  },
+  "comparisonUnavailable_viewport": {
+    "message": "Fenstergröße, Zoom oder sichtbarer Bereich unterscheiden sich. Wiederhole die Prüfung mit gleichen Abmessungen und gleicher Scrollposition.",
+    "description": "Style Inspector Lite: comparisonUnavailable_viewport"
+  },
+  "comparisonUnavailable_selection_root": {
+    "message": "Die ausgewählten Bereiche unterscheiden sich. Prüfe denselben Bereich erneut.",
+    "description": "Style Inspector Lite: comparisonUnavailable_selection_root"
+  },
+  "comparisonUnavailable_run_identity": {
+    "message": "Die Textbereiche lassen sich nicht zuverlässig zuordnen.",
+    "description": "Style Inspector Lite: comparisonUnavailable_run_identity"
+  },
+  "comparisonNoFindings": {
+    "message": "Keine Befunde in dieser Kategorie.",
+    "description": "Style Inspector Lite: comparisonNoFindings"
+  },
+  "comparisonNotCaptured": {
+    "message": "Nicht erfasst",
+    "description": "Style Inspector Lite: comparisonNotCaptured"
+  },
+  "comparisonBefore": {
+    "message": "Vorher: $value1$",
+    "description": "Style Inspector Lite: comparisonBefore",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "comparisonAfter": {
+    "message": "Jetzt: $value1$",
+    "description": "Style Inspector Lite: comparisonAfter",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "inventoryLimited": {
+    "message": "Diese Übersicht ist unvollständig, da eine Erfassungsgrenze erreicht wurde: $value1$.",
+    "description": "Style Inspector Lite: inventoryLimited",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "inventoryLimitColors": {
+    "message": "$value1$ Farben",
+    "description": "Style Inspector Lite: inventoryLimitColors",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "inventoryLimitFamilies": {
+    "message": "$value1$ Schriftfamilien",
+    "description": "Style Inspector Lite: inventoryLimitFamilies",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "inventoryLimitSizes": {
+    "message": "$value1$ Größen je Schriftfamilie",
+    "description": "Style Inspector Lite: inventoryLimitSizes",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "inventoryLimitVariants": {
+    "message": "$value1$ Varianten je Schriftfamilie",
+    "description": "Style Inspector Lite: inventoryLimitVariants",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "inventoryLimitElements": {
+    "message": "$value1$ Elemente",
+    "description": "Style Inspector Lite: inventoryLimitElements",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reason_partial_style_inventory": {
+    "message": "Die Farb- oder Typografieübersicht hat ihre Erfassungsgrenze erreicht.",
+    "description": "Style Inspector Lite: reason_partial_style_inventory"
+  },
+  "analysesTitle": {
+    "message": "Temporäre Analysen",
+    "description": "Style Inspector Lite: analysesTitle"
+  },
+  "analysesDescription": {
+    "message": "Analysen bleiben nur im Arbeitsspeicher und werden beim Neuladen der Seite, beim Browserneustart oder beim Löschen verworfen. Starte eine neue Messung manuell. Einstellungen bleiben erhalten.",
+    "description": "Style Inspector Lite: analysesDescription"
+  },
+  "analysesLoading": {
+    "message": "Wird geladen…",
+    "description": "Style Inspector Lite: analysesLoading"
+  },
+  "analysesRefresh": {
+    "message": "Übersicht aktualisieren",
+    "description": "Style Inspector Lite: analysesRefresh"
+  },
+  "analysesShow": {
+    "message": "Gespeicherte Analysen anzeigen",
+    "description": "Style Inspector Lite: analysesShow"
+  },
+  "analysesUsage": {
+    "message": "$value1$ von $value2$ Einträgen · ungefähr $value3$ von $value4$ KB",
+    "description": "Style Inspector Lite: analysesUsage",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      },
+      "value2": {
+        "content": "$2"
+      },
+      "value3": {
+        "content": "$3"
+      },
+      "value4": {
+        "content": "$4"
+      }
+    }
+  },
+  "analysesEstimate": {
+    "message": "Die Größe schätzt die gespeicherten Analysedaten, nicht den gesamten Speicherbedarf des Browsers. Tabtitel werden nur beim Aufruf dieser Übersicht gelesen.",
+    "description": "Style Inspector Lite: analysesEstimate"
+  },
+  "analysesEmpty": {
+    "message": "Keine Analysen gespeichert.",
+    "description": "Style Inspector Lite: analysesEmpty"
+  },
+  "analysesTab": {
+    "message": "Tab $value1$",
+    "description": "Style Inspector Lite: analysesTab",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "analysesCurrent": {
+    "message": "Aktueller Tab",
+    "description": "Style Inspector Lite: analysesCurrent"
+  },
+  "analysesRuns": {
+    "message": "$value1$ Textbereiche",
+    "description": "Style Inspector Lite: analysesRuns",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
+  "analysesRunning": {
+    "message": "Prüfung läuft",
+    "description": "Style Inspector Lite: analysesRunning"
+  },
+  "analysesSelection": {
+    "message": "Ausgewähltes Element",
+    "description": "Style Inspector Lite: analysesSelection"
+  },
+  "analysesBaseline": {
+    "message": "Vorherige Prüfung gespeichert",
+    "description": "Style Inspector Lite: analysesBaseline"
+  },
+  "analysesDelete": {
+    "message": "Diese Analyse löschen",
+    "description": "Style Inspector Lite: analysesDelete"
+  },
+  "analysesConfirm": {
+    "message": "Gespeicherte Messungen und den Vergleich für „$value1$“ löschen? Die Seite bleibt geöffnet.",
+    "description": "Style Inspector Lite: analysesConfirm",
+    "placeholders": {
+      "value1": {
+        "content": "$1"
+      }
+    }
+  },
   "cssValue": {
     "message": "CSS-Wert",
     "description": "Style Inspector Lite: cssValue"
+  },
+  "exportInventory": {
+    "message": "Quelle für Farben und Schriftarten",
+    "description": "Style Inspector Lite: exportInventory"
+  },
+  "exportInventoryMeasured": {
+    "message": "Seitenübersicht (gemessene Verwendung)",
+    "description": "Style Inspector Lite: exportInventoryMeasured"
+  },
+  "exportInventoryCSS": {
+    "message": "CSS-Eigenschaften der Elemente",
+    "description": "Style Inspector Lite: exportInventoryCSS"
+  },
+  "exportInventoryHelp": {
+    "message": "Die Übersicht enthält auch gemessene Platzhalterstile und erkannte Hintergründe. Die CSS-Variante nutzt color, background-color und font-family der Elemente. Beide beziehen sich auf den Prüfumfang; Filter und Sortierung der Übersicht ändern den Export nicht.",
+    "description": "Style Inspector Lite: exportInventoryHelp"
+  },
+  "reason_text_pseudo_style": {
+    "message": "Die erste Zeile oder der erste Buchstabe hat abweichende Darstellungsstile. Aus den CSS-Farben des Elements allein lässt sich der sichtbare Textkontrast nicht sicher bestimmen.",
+    "description": "Style Inspector Lite: reason_text_pseudo_style"
+  },
+  "reason_text_pseudo_font": {
+    "message": "Die erste Zeile oder der erste Buchstabe hat eine andere Schriftgröße oder Schriftstärke. Die Schriftwerte des Elements gelten daher nicht zuverlässig für den gesamten Text.",
+    "description": "Style Inspector Lite: reason_text_pseudo_font"
+  },
+  "reason_background_coverage": {
+    "message": "Der Text kann über die eingefärbte Hintergrundfläche hinausragen. Ein einheitlicher Hintergrund ist für den gesamten Textbereich nicht sicher bestimmbar.",
+    "description": "Style Inspector Lite: reason_background_coverage"
   }
 }

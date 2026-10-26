@@ -5,7 +5,7 @@ import { ElementRegistry } from '../../src/runtime/dom';
 const element = () => ({ isConnected: true }) as Element;
 const retained = (registry: ElementRegistry) => (registry as unknown as { elements: Map<string, Element> }).elements.size;
 
-test('registry retains current snapshots and releases replaced or disconnected nodes without reusing IDs', () => {
+test('registry releases selectable references but preserves weak identities for explicitly remeasured nodes', () => {
   const registry = new ElementRegistry('document');
   const selected = element(), old = element(), removed = element();
   const selectedId = registry.reference(selected), oldId = registry.reference(old), removedId = registry.reference(removed);
@@ -17,9 +17,10 @@ test('registry retains current snapshots and releases replaced or disconnected n
   assert.equal(registry.get(oldId), null);
   assert.equal(registry.get(removedId), null);
   const freshId = registry.reference(old);
-  assert.notEqual(freshId, oldId);
+  assert.equal(freshId, oldId, 'Remeasuring a connected node explicitly reactivates its own identity');
   Object.assign(removed, { isConnected: true });
-  assert.notEqual(registry.reference(removed), removedId, 'Reattaching a retired node does not resurrect a stale reference');
+  assert.equal(registry.get(removedId), null, 'Reattaching alone does not reactivate a retired reference');
+  assert.equal(registry.reference(removed), removedId, 'Only explicit remeasurement reactivates a reattached node');
   registry.clear();
   assert.equal(retained(registry), 0);
   assert.notEqual(registry.reference(selected), selectedId, 'A reset never recycles its earlier serials');
@@ -68,14 +69,18 @@ test('text identities survive sibling reordering and distinguish replacement nod
   assert.ok((registry as unknown as { textIds: WeakMap<Text, number> }).textIds instanceof WeakMap, 'Text objects are held only by weak keys');
 });
 
-test('retiring an owner and clearing the registry cannot revive previous text-run IDs', () => {
+test('manual scan resets preserve weak run identities while clearing stored data retires them permanently', () => {
   const registry = new ElementRegistry('retired-text');
   const owner = element(), node = unreadText();
   const initial = registry.textReference(owner, node);
   registry.retain(new Set());
   assert.equal(retained(registry), 0);
   const afterRetirement = registry.textReference(owner, node);
-  assert.notEqual(afterRetirement, initial, 'A renewed element identity also retires its former text runs');
+  assert.equal(afterRetirement, initial, 'Pruning selectable references does not break successive audit comparisons');
+  registry.clear(true);
+  assert.equal(retained(registry), 0);
+  assert.equal(registry.get(initial.split(':node')[0]!), null);
+  assert.equal(registry.textReference(owner, node), initial, 'A manual scan can remeasure the same Text object');
   registry.clear();
   assert.equal(retained(registry), 0);
   const afterClear = registry.textReference(owner, node);

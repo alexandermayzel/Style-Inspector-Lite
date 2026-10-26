@@ -5,9 +5,12 @@
   html, body { background: #fff; color: #000; font: 16px/24px sans-serif; }
   body { margin: 20px; }
   .row { margin: 12px 0; }
-  .boxless { display: contents; background: #000; color: #fff; }
+  .boxless { display: contents; background: #000; color: #fff; mask-image: linear-gradient(black, transparent); }
   .fill { color: #000; -webkit-text-fill-color: #777; }
   .stroke { color: #000; -webkit-text-stroke: 1px #f00; }
+  .masked { mask-image: linear-gradient(black, transparent); }
+  .masked-alpha { mask-image: linear-gradient(#0008, #0008); }
+  .mask-none { mask-image: none, none; }
 </style>
 <div class="row" id="ordinary">Ordinary text</div>
 <div class="row"><span class="boxless" id="boxless">Boxless background</span></div>
@@ -15,6 +18,11 @@
 <div class="row fill" id="fill">Separate glyph fill</div>
 <div class="row fill"><span id="inherited-fill">Inherited glyph fill</span></div>
 <div class="row stroke" id="stroke">Outlined glyphs</div>
+<div class="row masked" id="mask-direct">Masked description text</div>
+<div class="row masked"><span id="mask-ancestor">Text inside a masked wrapper</span></div>
+<div class="row masked-alpha" id="mask-alpha">Faded text</div>
+<div class="row mask-none" id="mask-none">Unmasked text with empty mask layers</div>
+<div class="row" id="mask-sibling">Unmasked sibling control</div>
 <div class="row" contenteditable="plaintext-only"><span>Private editor sentinel one</span></div>
 <div class="row" contenteditable="TRUE"><span>Private editor sentinel two</span></div>
 <div class="row" role="textbox"><span>Private editor sentinel three</span></div>

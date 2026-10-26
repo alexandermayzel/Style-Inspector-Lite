@@ -26,7 +26,7 @@ function fixture(raw: string, measure: (text: string) => ReturnType<typeof metri
   };
   const box = { left: 0, top: 0, width: 100, height: 20 };
   const element = { namespaceURI: 'http://www.w3.org/1999/xhtml', tagName: 'DIV', parentElement: null, ownerDocument: document,
-    clientLeft: 0, clientTop: 0, clientWidth: 100, clientHeight: 20,
+    clientLeft: 0, clientTop: 0, clientWidth: 100, clientHeight: 20, scrollLeft: 0, scrollTop: 0,
     closest: () => null, matches: () => false, getClientRects: () => [box], getBoundingClientRect: () => box };
   const text = { data: raw, length: raw.length, parentElement: element, ownerDocument: document,
     previousSibling: null as unknown, nextSibling: null as unknown };
@@ -51,6 +51,44 @@ function positionedFixture() {
   Object.assign(context.document.defaultView, { getComputedStyle: (node: unknown) => styles.get(node) });
   return { ...context, parent };
 }
+
+test('guarded glyph ink can prove a zero-width overflowing helper wholly masked', () => {
+  const context = fixture('…', () => ({ ...metrics(14, -2), actualBoundingBoxRight: 12, actualBoundingBoxAscent: 2, actualBoundingBoxDescent: 0 }));
+  context.style.whiteSpace = 'pre-wrap'; context.style.overflowX = 'visible'; context.style.overflowY = 'visible'; context.style.display = 'inline-block';
+  context.box.width = 0;
+  const parentBox = { left: 0, top: 0, width: 200, height: 60 };
+  const parent = { ...context.element, getClientRects: () => [parentBox], getBoundingClientRect: () => parentBox };
+  const parentStyle = { ...context.style, display: 'block', maskImage: 'linear-gradient(to top, transparent 0%, transparent 20px, black 20px, black 100%), linear-gradient(to right, black 0%, black -21px, transparent 3px, transparent 100%)',
+    maskSize: 'auto', maskPosition: '0% 0%', maskOrigin: 'border-box', maskClip: 'border-box', maskMode: 'match-source', maskComposite: 'add', maskRepeat: 'repeat' };
+  Object.assign(context.element, { parentElement: parent });
+  context.document.defaultView.getComputedStyle = (node?: unknown) => node === parent ? parentStyle : context.style;
+  const rect = { left: 3.883, top: 40, width: 14, height: 18 };
+  assert.equal(context.hidden(rect), true, 'Mask uses measured ink, not the zero-width owner or padded font box');
+  assert.equal(context.hidden({ ...rect, left: 1 }), false, 'Glyph rounding guard reaches the visible fade');
+  assert.equal(context.hidden({ ...rect, top: 25 }), false, 'Partially visible glyph stays');
+  parentStyle.maskComposite = 'exclude'; assert.equal(context.hidden(rect), false);
+  parentStyle.maskComposite = 'add'; context.style.textShadow = '1px 1px black'; assert.equal(context.hidden(rect), false);
+  context.style.textShadow = 'none'; context.document.fonts.status = 'loading'; assert.equal(context.hidden(rect), false);
+  context.document.fonts.status = 'loaded'; context.style.whiteSpace = 'pre-wrap'; context.text.data = '… '; context.text.length = 2;
+  assert.equal(context.hidden(rect), false, 'Preserved spaces remain outside the single-glyph proof');
+});
+
+test('unsupported mask ancestors consume the same bounded proof budget', () => {
+  const nested = (count: number) => {
+    const context = fixture('helper');
+    context.style.maskImage = 'url("unresolved-mask.svg")';
+    let tail = context.element;
+    for (let index = 1; index < count; index++) {
+      const parent = { ...context.element, parentElement: null };
+      Object.assign(tail, { parentElement: parent }); tail = parent;
+    }
+    return context;
+  };
+  assert.equal(nested(8).hidden(), true, 'Ordinary clipping proof can still succeed within the work budget');
+  const overBudget = nested(9);
+  assert.equal(overBudget.hidden(), false);
+  assert.equal(overBudget.measured.length, 0, 'Unsupported mask attempts stop before Canvas work');
+});
 
 test('absolute text uses clips at and outside a proven positioned containing block', () => {
   const contained = positionedFixture();
@@ -338,7 +376,7 @@ test('pre-line preserved breaks, controls and multiple fragments remain outside 
   const wrapped = wrappedFixture(); wrapped.style.whiteSpace = 'pre-line';
   assert.deepEqual(wrapped.visible(), wrapped.rects);
   assert.equal(wrapped.calls(), 0, 'Multiple pre-line fragments do not enter the wrapped-line mapper');
-  for (const whiteSpace of ['pre', 'pre-wrap', 'break-spaces']) {
+  for (const whiteSpace of ['pre-wrap', 'break-spaces']) {
     const unsupported = fixture('20:04'); unsupported.style.whiteSpace = whiteSpace;
     assert.equal(unsupported.hidden(), false, whiteSpace);
   }
@@ -361,6 +399,56 @@ test('pre-line keeps the metric, overhang, effect and adjacent-text safeguards',
     Object.assign(context.document.defaultView, { getComputedStyle: (node: unknown) => node === ancestor ? ancestorStyle : context.style });
     assert.equal(context.hidden(), true, `Explicit child pre-line overrides ancestor ${whiteSpace}`);
   }
+});
+
+test('single-fragment pre digits are omitted only outside a proven overflow clip', () => {
+  for (const raw of ['7', '42', '\u00a07\u00a0']) {
+    const context = fixture(raw); context.style.whiteSpace = 'pre';
+    assert.equal(context.hidden(), true);
+    assert.deepEqual(context.measured, [raw], 'Pre content reaches Canvas unchanged');
+    assert.equal(context.hidden({ left: 0, top: -30, width: 100, height: 18 }), true);
+    assert.equal(context.hidden({ left: 0, top: 30, width: 100, height: 18 }), true);
+    assert.equal(context.hidden({ left: 0, top: 1, width: 100, height: 18 }), false);
+    assert.equal(context.hidden({ left: 0, top: 19, width: 100, height: 18 }), false, 'Partly visible digits remain');
+    context.style.overflowX = 'visible'; context.style.overflowY = 'visible';
+    assert.equal(context.hidden(), false, 'Offscreen content without clipping remains');
+  }
+});
+
+test('pre spaces, preserved controls and multiple fragments are never normalized into a clipping proof', () => {
+  for (const raw of [' 7', '7 ', '7 7', '7  7', '\t7', '7\n', '\n7', '7\r', '7\f']) {
+    const context = fixture(raw); context.style.whiteSpace = 'pre';
+    assert.equal(context.hidden(), false, JSON.stringify(raw));
+    assert.equal(context.measured.length, 0);
+  }
+  const wrapped = wrappedFixture(); wrapped.style.whiteSpace = 'pre';
+  assert.deepEqual(wrapped.visible(), wrapped.rects);
+  assert.equal(wrapped.calls(), 0);
+});
+
+test('adjacent pre counter rows use verified ink while retaining overhang across the clip edge', () => {
+  const above = { left: 0, top: -19, width: 100, height: 18 }, below = { left: 0, top: 21, width: 100, height: 18 };
+  const context = fixture('7'); context.style.whiteSpace = 'pre';
+  assert.equal(context.hidden(above), true, 'Only empty font-box padding approaches the top edge');
+  assert.equal(context.hidden(below), true, 'Only empty font-box padding approaches the bottom edge');
+  const descendingInk = fixture('7', () => ({ ...metrics(), actualBoundingBoxDescent: 7 })); descendingInk.style.whiteSpace = 'pre';
+  assert.equal(descendingInk.hidden(above), false, 'Ink reaching below the top clip remains');
+  const ascendingInk = fixture('7', () => ({ ...metrics(), actualBoundingBoxAscent: 24 })); ascendingInk.style.whiteSpace = 'pre';
+  assert.equal(ascendingInk.hidden(below), false, 'Ink reaching above the bottom clip remains');
+});
+
+test('pre digits retain metric, ink-overhang, effect and shaping safeguards', () => {
+  const mismatch = fixture('7', () => metrics(90)); mismatch.style.whiteSpace = 'pre';
+  assert.equal(mismatch.hidden(), false);
+  const overhang = fixture('7', () => ({ ...metrics(), actualBoundingBoxAscent: 80 })); overhang.style.whiteSpace = 'pre';
+  assert.equal(overhang.hidden({ left: 0, top: 30, width: 100, height: 18 }), false, 'Ink can extend back into the clip');
+  for (const property of ['textShadow', 'filter']) {
+    const effect = fixture('7'); effect.style.whiteSpace = 'pre'; effect.style[property] = property === 'filter' ? 'blur(10px)' : '0 -30px white';
+    assert.equal(effect.hidden(), false, property);
+  }
+  const adjacent = fixture('7'); adjacent.style.whiteSpace = 'pre';
+  adjacent.text.nextSibling = { nodeType: 3, length: 1, substringData: () => '8' };
+  assert.equal(adjacent.hidden(), false);
 });
 
 test('box shadows on a clipping box or its ancestor cannot reveal fully clipped glyphs', () => {

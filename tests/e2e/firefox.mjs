@@ -91,13 +91,28 @@ try {
       return {x:Math.round(outer.x+inner.x+arguments[0].x),y:Math.round(outer.y+inner.y+arguments[0].y)};`, point);
     await driver.actions().move({origin:'viewport',x:position.x,y:position.y}).press().release().perform();
   };
-  const waitAudit = () => driver.wait(async () => ui("return !!doc.querySelector('.metrics') && !!doc.querySelector('main .section-title button.primary');"),15000);
-  // A rescan command travels through the background before clearing old cards.
-  // Wait for the asserted result instead of accepting a still-visible old audit.
+  const waitAudit = () => driver.wait(async () => ui("return !!doc.querySelector('.metrics') && !!doc.querySelector('main .section-title button.primary:not(:disabled)');"),15000);
+  // The prior audit remains visible until the content process accepts a new
+  // scan. Its disabled action distinguishes that pending state from completion.
   const assertCounts = async (readCounts, expected, message) => {
-    await driver.wait(async () => { const actual = await readCounts(); return Object.keys(expected).every(key => actual[key] === expected[key]); },15000,message);
+    let lastCounts;
+    try {
+      await driver.wait(async () => { lastCounts = await readCounts(); return Object.keys(expected).every(key => lastCounts[key] === expected[key]); },15000,message);
+    } catch (error) {
+      throw new Error(`${message}\nExpected counts: ${JSON.stringify(expected)}\nLast counts: ${JSON.stringify(lastCounts)}`, { cause: error });
+    }
     assert.deepEqual(await readCounts(), expected, message);
   };
+  const scanClick = async () => {
+    const point=await ui(`const b=doc.querySelector('main button.primary');
+      if(!b || b.disabled) throw new Error('Scan action unavailable');
+      b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};`);
+    const position=await driver.executeScript(`const side=document.getElementById('sidebar'),outer=side.getBoundingClientRect();
+      const inner=side.contentDocument.getElementById('webext-panels-browser').getBoundingClientRect();
+      return {x:Math.round(outer.x+inner.x+arguments[0].x),y:Math.round(outer.y+inner.y+arguments[0].y)};`,point);
+    await driver.actions().move({origin:'viewport',x:position.x,y:position.y}).press().release().perform();
+  };
+  if (!process.argv.includes('--scopes-only')) {
   let initial = await read();
   assert.equal(initial.tab, 'tab-audit');
   await driver.wait(async () => !(await read()).pickerDisabled, 10000, 'Initial document activation');
@@ -267,15 +282,7 @@ try {
   // Native input matters here: script .click() does not carry the activation
   // required by permissions.request(). Never pre-grant permissions in this test.
   await ui("doc.documentElement.dataset.testInstance='kept-open';");
-  const scanClick = async () => {
-    const point=await ui(`const b=doc.querySelector('main button.primary');
-      if(!b || b.disabled) throw new Error('Scan action unavailable');
-      b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};`);
-    const position=await driver.executeScript(`const side=document.getElementById('sidebar'),outer=side.getBoundingClientRect();
-      const inner=side.contentDocument.getElementById('webext-panels-browser').getBoundingClientRect();
-      return {x:Math.round(outer.x+inner.x+arguments[0].x),y:Math.round(outer.y+inner.y+arguments[0].y)};`,point);
-    await driver.actions().move({origin:'viewport',x:position.x,y:position.y}).press().release().perform();
-  };
+
   const permissionPrompt = By.id('addon-webext-permissions-notification');
   const answerPermission = async allow => {
     await driver.wait(until.elementIsVisible(await driver.wait(until.elementLocated(permissionPrompt),10000)),10000);
@@ -383,7 +390,7 @@ try {
     failed:Number(doc.querySelector('[data-rule="contrast"] .metric-count.fail .metric-count-value').textContent),
     manual:Number(doc.querySelector('[data-rule="contrast"] .metric-count.manual .metric-count-value').textContent)
   };`);
-  assert.deepEqual(await overlapCounts(), { scanned: 12, passed: 4, failed: 0, manual: 8 }, 'Transparent logo padding and stretched boxes are harmless; real paint and unbounded geometry remain uncertain');
+  await assertCounts(overlapCounts, { scanned: 12, passed: 4, failed: 0, manual: 8 }, 'Transparent logo padding and stretched boxes are harmless; real paint and unbounded geometry remain uncertain');
   await driver.setContext('content');
   await driver.executeScript(() => {
     const shadow = document.getElementById('logo-wrap').attachShadow({ mode: 'closed' });
@@ -391,12 +398,12 @@ try {
   });
   await driver.setContext('chrome');
   await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
-  assert.deepEqual(await overlapCounts(), { scanned: 12, passed: 3, failed: 0, manual: 9 }, 'Firefox content scripts detect closed shadow hosts and keep their unknown paint unassessed');
+  await assertCounts(overlapCounts, { scanned: 12, passed: 3, failed: 0, manual: 9 }, 'Firefox content scripts detect closed shadow hosts and keep their unknown paint unassessed');
   await driver.setContext('content');
   await driver.executeScript('document.getElementById("logo-wrap").remove(); document.getElementById("solid-overlay").remove();');
   await driver.setContext('chrome');
   await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
-  assert.deepEqual(await overlapCounts(), { scanned: 12, passed: 5, failed: 0, manual: 7 }, 'Removing real overlapping paint is reflected in the next audit');
+  await assertCounts(overlapCounts, { scanned: 12, passed: 5, failed: 0, manual: 7 }, 'Removing real overlapping paint is reflected in the next audit');
   checks.push('Country labels beside transparent logo padding are assessed; real overlays, closed shadow hosts, later text fragments and geometry limits remain uncertain; rescan reflects removed paint');
   await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/gradient-contrast.html`);
   await driver.setContext('chrome');
@@ -456,17 +463,21 @@ try {
   await driver.wait(async () => (await read()).pickerDisabled,10000);
   await scanClick(); await waitAudit();
   await assertCounts(decorationCounts, { scanned: 12, passed: 4, failed: 0, manual: 8, small: 0 }, 'Normal offscreen flow and nonpainting touch wrappers retain their opaque background while displaced or unpainted backgrounds and text emphasis stay uncertain');
+  const offscreenCSSPairs = () => ui(`const pairs=[...doc.querySelectorAll('.finding .contrast-value[data-source="css-colors"]')];
+    return {count:pairs.length,unverified:pairs.every(node=>node.dataset.status==='manual'),passing:pairs.every(node=>node.dataset.cssStatus==='pass')};`);
+  assert.deepEqual(await offscreenCSSPairs(), { count: 6, unverified: true, passing: true }, 'Displaced offscreen labels retain their enclosing CSS color pair while page paint stays unverified');
   await driver.setContext('content');
   await driver.executeScript('document.getElementById("static-flow").classList.add("transformed");');
   await driver.setContext('chrome');
   await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 12, passed: 3, failed: 0, manual: 9, small: 0 }, 'Moving an offscreen transparent label removes the unverified background on rescan');
+  await assertCounts(decorationCounts, { scanned: 12, passed: 3, failed: 0, manual: 9, small: 0 }, 'Moving an offscreen transparent label keeps its page contrast unverified on rescan');
+  assert.deepEqual(await offscreenCSSPairs(), { count: 7, unverified: true, passing: true }, 'The changed label retains a CSS pair without upgrading the page assessment');
   await driver.setContext('content');
   await driver.executeScript('document.querySelector(".touch-effect > div").style.opacity="1";');
   await driver.setContext('chrome');
   await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
   await assertCounts(decorationCounts, { scanned: 12, passed: 2, failed: 0, manual: 10, small: 0 }, 'Actually painted touch-feedback overlays remain uncertain on rescan');
-  checks.push('Offscreen pointer-transparent labels retain exact contrast in normal and zero-offset flow inside an opaque positioned surface; floating, moved, negative-margin, contents-only, overflowing backgrounds and text emphasis stay uncertain; rescan refreshes displacement');
+  checks.push('Offscreen pointer-transparent labels retain exact contrast in normal flow; displaced labels retain only fully covering CSS ancestor pairs with unverified page paint, while boxless or partial backgrounds remain unknown and rescan refreshes displacement');
   await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/negative-background.html`);
   await driver.setContext('chrome');
   await driver.wait(async () => (await read()).pickerDisabled,10000);
@@ -506,10 +517,14 @@ try {
   assert.ok(await ui("return /13[.,]57/.test(doc.querySelector('main .ratio')?.textContent ?? '');"), 'Fresh inspection measures the now-visible white link on its dark background');
   await ui("doc.querySelector('#tab-audit').click();");
   await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 3, passed: 2, failed: 1, manual: 0, small: 0 }, 'Conflicting inspection refreshes the entire audit, including an unrelated new row and a separate contrast failure');
-  assert.equal((await readFreshnessAudit()).stale, false);
+  await assertCounts(decorationCounts, { scanned: 2, passed: 1, failed: 0, manual: 1, small: 0 }, 'Conflicting inspection leaves the historical audit unchanged until an explicit rescan');
+  assert.equal((await readFreshnessAudit()).stale, true);
   await ui("doc.querySelector('#tab-contrast').click();");
-  assert.ok(await ui("return !!doc.querySelector('.selected-card') && /13[.,]57/.test(doc.querySelector('main .ratio')?.textContent ?? '') && doc.querySelector('.element-text-value')?.value==='Covered navigation link';"), 'The automatic audit preserves the confirmed selection and its excerpt');
+  assert.ok(await ui("return !!doc.querySelector('.selected-card') && /13[.,]57/.test(doc.querySelector('main .ratio')?.textContent ?? '') && doc.querySelector('.element-text-value')?.value==='Covered navigation link';"), 'Explicit inspection measures only the selected element and preserves its excerpt');
+  await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();");
+  await waitAudit();
+  await assertCounts(decorationCounts, { scanned: 3, passed: 2, failed: 1, manual: 0, small: 0 }, 'Only Check again refreshes the entire audit, including unrelated new rows and failures');
+  assert.equal((await readFreshnessAudit()).stale, false);
   await driver.setContext('content');
   await driver.executeScript(`const sheet=document.getElementById('dynamic-rules').sheet;
     sheet.cssRules[0].style.display='block';sheet.cssRules[1].style.display='none';sheet.deleteRule(2);`);
@@ -517,7 +532,10 @@ try {
   await ui("doc.querySelector('.finding .actions button:nth-child(2)').click();");
   await driver.wait(async () => (await read()).tab === 'tab-contrast' && await ui("return !!doc.querySelector('main .contrast-value[data-status=manual]');"),10000);
   await ui("doc.querySelector('#tab-audit').click();"); await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 2, passed: 1, failed: 0, manual: 1, small: 0 }, 'A new real overlay also refreshes a previous pass back to uncertainty, without keeping the best result');
+  await assertCounts(decorationCounts, { scanned: 3, passed: 2, failed: 1, manual: 0, small: 0 }, 'A newly uncertain inspection marks the previous passing audit stale without rescanning');
+  assert.equal((await readFreshnessAudit()).stale, true);
+  await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
+  await assertCounts(decorationCounts, { scanned: 2, passed: 1, failed: 0, manual: 1, small: 0 }, 'An explicit scan includes the newly painted overlay');
   await driver.setContext('content');
   await driver.executeScript(`const sheet=document.getElementById('dynamic-rules').sheet;
     sheet.cssRules[0].style.display='none';sheet.insertRule('#covered {color:#232F3E}',sheet.cssRules.length);`);
@@ -525,16 +543,43 @@ try {
   await ui("doc.querySelector('.finding .actions button:nth-child(2)').click();");
   await driver.wait(async () => (await read()).tab === 'tab-contrast' && await ui("return !!doc.querySelector('main .contrast-value[data-status=fail]');"),10000);
   await ui("doc.querySelector('#tab-audit').click();"); await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 2, passed: 1, failed: 1, manual: 0, small: 0 }, 'A newly measurable failing contrast refreshes coherently just like a pass');
+  await assertCounts(decorationCounts, { scanned: 2, passed: 1, failed: 0, manual: 1, small: 0 }, 'A newly measurable failure also keeps the previous audit until the user requests a scan');
+  assert.equal((await readFreshnessAudit()).stale, true);
+  await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
+  await assertCounts(decorationCounts, { scanned: 2, passed: 1, failed: 1, manual: 0, small: 0 }, 'The requested full scan includes the new failure');
   await driver.setContext('content'); await driver.executeScript("document.getElementById('dynamic-rules').sheet.deleteRule(2);");
   await driver.setContext('chrome');
   await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 2, passed: 2, failed: 0, manual: 0, small: 0 }, 'A manual rescan remains available after automatic reconciliation');
+  await assertCounts(decorationCounts, { scanned: 2, passed: 2, failed: 0, manual: 0, small: 0 }, 'The user can request another scan after resolving the failure');
   assert.equal((await readFreshnessAudit()).stale, false);
   await ui("doc.querySelector('#tab-contrast').click();");
   assert.equal(await ui("return !!doc.querySelector('.selected-card');"), false, 'The explicit rescan still clears the previous selection');
   await ui("doc.querySelector('#tab-audit').click();");
-  checks.push('Conflicting explicit inspection automatically refreshes the entire audit while preserving selection; newly visible unrelated text and separate failures update together, pass-to-uncertain and uncertain-to-fail transitions work, unchanged inspections stay fresh and manual rescans still clear selection');
+  checks.push('Explicit inspection measures only the selected element and marks contradictory audit evidence stale; pass, failure and uncertainty keep historical totals until Check again refreshes all rows, while unchanged inspections stay fresh and explicit scans clear selection');
+  await ui("doc.querySelector('.finding .actions button:nth-child(2)').click();");
+  await driver.wait(async () => (await read()).tab === 'tab-contrast' && await ui("return !!doc.querySelector('main .contrast-value[data-status=pass]');"),10000);
+  const priorDynamicSelection = await ui("return {ratio:doc.querySelector('main .ratio').textContent,text:doc.querySelector('.element-text-value').value};");
+  assert.match(priorDynamicSelection.ratio, /13[.,]57/);
+  await driver.setContext('content');
+  await driver.executeAsyncScript(`const done=arguments[arguments.length-1],target=document.getElementById('covered');
+    target.style.color='#232F3E';let batches=0;
+    const timer=setInterval(()=>{for(let i=0;i<100;i++)target.dataset.testMutation=String(batches*100+i);
+      if(++batches===40){clearInterval(timer);done();}},20);`);
+  await driver.manage().window().setRect({ width: 1260, height: 980 });
+  await driver.setContext('chrome');
+  await driver.wait(async () => ui("return !!doc.querySelector('main > .notice.warning button');"),10000,'Dynamic mutations and resizing require an explicit refresh');
+  await driver.sleep(350);
+  assert.deepEqual(await ui("return {ratio:doc.querySelector('main .ratio').textContent,text:doc.querySelector('.element-text-value').value};"), priorDynamicSelection, 'Mutations and viewport changes do not silently remeasure the selected element');
+  await ui("doc.querySelector('#tab-audit').click();");
+  await assertCounts(decorationCounts, { scanned: 2, passed: 2, failed: 0, manual: 0, small: 0 }, 'Dynamic page bursts do not replace audit totals');
+  assert.equal((await readFreshnessAudit()).stale, true);
+  await ui("doc.querySelector('#tab-contrast').click();doc.querySelector('main > .notice.warning button').click();");
+  await driver.wait(async () => ui("return !!doc.querySelector('main .contrast-value[data-status=fail]') && !doc.querySelector('main > .notice.warning');"),10000,'Only the explicit selection refresh measures the changed text color');
+  await ui("doc.querySelector('#tab-audit').click();");
+  await assertCounts(decorationCounts, { scanned: 2, passed: 2, failed: 0, manual: 0, small: 0 }, 'Refreshing one element still leaves the full audit snapshot untouched');
+  await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
+  await assertCounts(decorationCounts, { scanned: 2, passed: 1, failed: 1, manual: 0, small: 0 }, 'Explicit Check again updates all results after a dynamic mutation burst');
+  checks.push('Four thousand real DOM mutations plus window resize leave selected ratios and audit counts unchanged with a stale warning; explicit selection refresh updates only the element and Check again updates the page audit');
   await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/overflow-text.html`);
   await driver.setContext('chrome');
   await driver.wait(async () => (await read()).pickerDisabled,10000);
@@ -544,6 +589,7 @@ try {
   await driver.executeScript('const nav=document.querySelector(".nav");nav.style.height="78px";nav.scrollTop=0;');
   await driver.setContext('chrome');
   await ui("doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
+  await driver.wait(async () => (await decorationCounts()).scanned===12,15000,'The refreshed scan includes the revealed navigation row');
   assert.equal((await decorationCounts()).scanned, 12, 'Revealing a navigation row includes its text on rescan');
   await ui("doc.querySelector('#tab-contrast').click(); doc.querySelector('.picker').click();");
   await driver.setContext('content');
@@ -739,7 +785,13 @@ try {
   await driver.setContext('chrome');
   await driver.wait(async () => (await read()).pickerDisabled,10000);
   await scanClick(); await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 5, passed: 0, failed: 0, manual: 5, small: 0 }, 'Clipped positive and negative pixel-indented labels are excluded; partial, unclipped, offscreen, shadowed and percentage-indent text stays included');
+  await assertCounts(decorationCounts, { scanned: 5, passed: 0, failed: 2, manual: 3, small: 0 }, 'Clipped pixel-indented labels are excluded; visible and unclipped offscreen text use the white canvas outside their image box, while partial, shadowed and unresolved clipped text stay uncertain');
+  const displacedRatios = await ui("return [...doc.querySelectorAll('.finding .contrast-value[data-status=fail]')].map(node=>({ratio:node.querySelector('.audit-ratio').title,source:node.dataset.source??null}));");
+  assert.equal(displacedRatios.length, 2);
+  for (const measured of displacedRatios) {
+    assert.equal(measured.source, null, 'The displaced label has a confirmed white background, not only a CSS pair');
+    assert.ok(Math.abs(Number.parseFloat(measured.ratio.replace(',', '.')) - 2.99978868018584) < 1e-8, '#0099FF on white has a real failing contrast outside the 36px image box');
+  }
   const indentLanguage = await ui('return doc.documentElement.lang;');
   assert.ok(['en', 'de'].includes(indentLanguage));
   const indentCatalog = JSON.parse(await readFile(path.join(extensionDirectory, '_locales', indentLanguage, 'messages.json'), 'utf8'));
@@ -758,7 +810,7 @@ try {
   await driver.executeScript('document.getElementById("reported").style.textIndent="0px";');
   await driver.setContext('chrome');
   await ui("doc.querySelector('#tab-audit').click(); doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 6, passed: 0, failed: 0, manual: 6, small: 0 }, 'Revealing an indented label adds its visible text to the completed rescan');
+  await assertCounts(decorationCounts, { scanned: 6, passed: 0, failed: 2, manual: 4, small: 0 }, 'Revealing an indented label adds uncertain text over its image, while the two outside-image contrasts remain measured');
   assert.equal(await ui(`return doc.querySelector('main').textContent.includes(${JSON.stringify(indentCatalog.statusStale.message)});`), false, 'The fresh rescan has no stale-result notice');
   checks.push('Image-replacement labels hidden by finite pixel indentation are excluded from text contrast; selecting the icon explains the text-only scope without a ratio or AA/AAA while retaining raw CSS, and revealing the label updates a fresh audit');
   await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/comparison-colors.html`);
@@ -833,12 +885,16 @@ try {
   await driver.executeScript("const other=document.createElement('input');other.type='hidden';other.id='ambiguous-control';document.getElementById('control-hint').parentElement.append(other);");
   await driver.setContext('chrome'); await rescanHint();
   await ui("doc.querySelector('[data-filter=manual]').click();");
+  // Overall counts are unchanged; wait for this scan's changed CSS-pair
+  // evidence instead of accepting an earlier audit with matching totals.
+  await driver.wait(async()=>ui("return doc.querySelectorAll('.finding').length===1;"),15000,'The ambiguous-control result reaches the sidebar');
   assert.equal(await ui("return doc.querySelectorAll('.finding').length;"), 1, 'Ambiguous sibling controls cannot be assigned by DOM order');
   assert.notEqual((await hintAuditPair()).source, 'css-colors');
   await driver.setContext('content');
   await driver.executeScript("document.getElementById('ambiguous-control').remove();document.getElementById('control-hint').parentElement.style.transform='';");
   await driver.setContext('chrome'); await rescanHint();
   await ui("doc.querySelector('[data-filter=all]').click();");
+  await driver.wait(async () => JSON.stringify(await hintAuditPair())===JSON.stringify(offscreenPair),15000,'The fresh onscreen audit supplies the same CSS pair');
   assert.deepEqual(await hintAuditPair(), offscreenPair, 'Onscreen and offscreen audit values match');
   checks.push('Offscreen floating hints retain a bounded unverified sibling-input CSS pair in both audit and inspection; No measurement and CSS-pair filters agree, ambiguous inputs remain unresolved and private control values stay unread');
   await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/clamped-return-link.html`);
@@ -965,9 +1021,9 @@ try {
   const rescanEmptyClip = async (expected, explanation) => {
     await ui("doc.querySelector('#tab-audit').click();");
     // DOM mutations can briefly refresh the sidebar connection. Wait for the
-    // actual action before checking its synchronous reset behavior.
+    // actual action before checking its pending-start preservation behavior.
     await driver.wait(async()=>ui("return !!doc.querySelector('main .section-title button.primary:not(:disabled)');"),10000);
-    assert.equal(await ui("doc.querySelector('main .section-title button.primary').click();return !doc.querySelector('.metrics');"), true, 'Rescan clears the previous audit before checking an equal count');
+    assert.equal(await ui("doc.querySelector('main .section-title button.primary').click();return !!doc.querySelector('.metrics') && !!doc.querySelector('main .section-title button.primary:disabled');"), true, 'Pending rescan preserves the previous audit until the new root is accepted');
     await waitAudit();
     await assertCounts(emptyClipCounts, { scanned: expected }, explanation);
   };
@@ -1035,7 +1091,7 @@ try {
     assert.deepEqual(measured.colors, ['#FFFFFF', '#222222'], `${selectedId}: inspection agrees with the audit and keeps the actual opaque background`);
   }
   const rescanEuro = async (expected, explanation) => {
-    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !doc.querySelector('.metrics');"), true);
+    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !!doc.querySelector('.metrics') && !!doc.querySelector('main .section-title button.primary:disabled');"), true);
     await waitAudit(); await assertCounts(decorationCounts, expected, explanation);
   };
   await driver.setContext('content'); await driver.executeScript("document.getElementById('cover').style.display='block';");
@@ -1130,7 +1186,7 @@ try {
   };
   const carouselCounts = () => ui("return {scanned:Number(doc.querySelector('.scope-grid strong').textContent)};");
   const rescanCarousel = async (expected, explanation) => {
-    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !doc.querySelector('.metrics');"), true);
+    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !!doc.querySelector('.metrics') && !!doc.querySelector('main .section-title button.primary:disabled');"), true);
     await waitAudit(); await assertCounts(carouselCounts, { scanned: expected }, explanation);
   };
   await isolateCarouselCase('viewport');
@@ -1179,7 +1235,7 @@ try {
   const rescanSlotted = async (expected, explanation) => {
     // A DOM click starts the scan without moving keyboard focus off the page.
     // A native sidebar click would hide a focus-only shortcut before measuring it.
-    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !doc.querySelector('.metrics');"), true);
+    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !!doc.querySelector('.metrics') && !!doc.querySelector('main .section-title button.primary:disabled');"), true);
     await waitAudit(); await assertCounts(slottedCounts, { scanned: expected }, explanation);
   };
   const skipState = async () => {
@@ -1291,7 +1347,7 @@ try {
     manual:Number(doc.querySelector('[data-rule="contrast"] .metric-count.manual .metric-count-value').textContent)
   };`);
   const rescanFloatCases = async (expected, explanation) => {
-    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !doc.querySelector('.metrics');"), true);
+    assert.equal(await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();return !!doc.querySelector('.metrics') && !!doc.querySelector('main .section-title button.primary:disabled');"), true);
     await waitAudit(); await assertCounts(floatCounts, expected, explanation);
   };
   const offscreenItems = await configureFloatCases('good', true);
@@ -1359,7 +1415,9 @@ try {
   await driver.setContext('chrome');
   await driver.wait(async () => (await read()).pickerDisabled,10000);
   await scanClick(); await waitAudit();
-  await assertCounts(decorationCounts, { scanned: 7, passed: 2, failed: 4, manual: 1, small: 0 }, 'Boxless backgrounds cannot pass white-on-white text; glyph fill controls contrast and editor contents stay excluded');
+  await assertCounts(decorationCounts, { scanned: 12, passed: 4, failed: 4, manual: 4, small: 0 }, 'Boxless backgrounds cannot pass white-on-white text; masks stay uncertain, glyph fill controls contrast and editor contents stay excluded');
+  assert.equal(await ui("return [...doc.querySelectorAll('.finding')].filter(card=>/CSS mask|CSS-Maske/.test(card.textContent)).length;"), 3, 'Direct, ancestor and alpha masks explain uncertainty');
+  assert.equal(await ui("return [...doc.querySelectorAll('.finding')].filter(card=>/CSS mask|CSS-Maske/.test(card.textContent) && card.textContent.includes('21')).length;"), 3, 'Masked text retains its labeled CSS color pair');
   await ui("doc.querySelector('#tab-contrast').click();doc.querySelector('.picker').click();");
   await driver.setContext('content');
   await driver.wait(until.elementLocated(By.css('[data-style-inspector-overlay]')),10000);
@@ -1370,7 +1428,283 @@ try {
   await driver.setContext('content'); await driver.executeScript("document.designMode='on';");
   await driver.setContext('chrome'); await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
   await assertCounts(decorationCounts, { scanned: 0, passed: 0, failed: 0, manual: 0, small: 0 }, 'A document in designMode does not inspect editing contents');
-  checks.push('Boxless background colors never certify invisible white text; explicit and inherited sRGB glyph fill supplies the measured contrast, outlined text stays uncertain, plaintext-only/mixed-case/semantic editors and designMode stay outside text measurement while ordinary noneditable text remains');
+  checks.push('Boxless backgrounds and masks do not paint; explicit and inherited glyph fill supplies contrast, masked text retains an unverified CSS pair while ordinary siblings stay measured, outlined text stays uncertain and editable text remains excluded');
+  await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/masked-description.html`);
+  const maskedGeometry = await driver.executeScript(`return [...document.querySelectorAll('.ellipsis')].map(node=>{
+    const range=document.createRange();range.selectNodeContents(node.firstChild);
+    return {id:node.id,box:node.getBoundingClientRect().width,text:range.getBoundingClientRect().width,whiteSpace:getComputedStyle(node).whiteSpace};});`);
+  assert.ok(maskedGeometry.every(item=>item.box===0 && item.text>10 && item.whiteSpace==='pre-wrap'), 'Zero-width owners retain real overflowing ellipsis glyphs');
+  await driver.setContext('chrome'); await driver.wait(async () => (await read()).pickerDisabled,10000);
+  await scanClick(); await waitAudit();
+  await assertCounts(decorationCounts, { scanned: 9, passed: 6, failed: 0, manual: 3, small: 0 }, 'Only the wholly transparent masked ellipsis is excluded; real expansion controls and visible zero-width text stay measured');
+  const descriptionRows = await ui("return [...doc.querySelectorAll('.finding')].map(row=>({source:row.querySelector('.contrast-value').dataset.source,ratio:row.querySelector('.audit-ratio').textContent,manual:/CSS mask|CSS-Maske/.test(row.textContent)}));");
+  assert.equal(descriptionRows.filter(row=>row.manual && row.source==='css-colors').length,3,'Partial and unsupported masks preserve CSS pairs without certifying page rendering');
+  assert.ok(descriptionRows.filter(row=>!row.manual).every(row=>/13[.,]23/.test(row.ratio)),'Visible expansion controls retain their dark-surface contrast');
+  await driver.setContext('content');
+  await driver.executeScript("document.querySelectorAll('.snippet').forEach(node=>node.style.maskImage='none');document.querySelectorAll('.expand').forEach(node=>node.style.left='120px');");
+  await driver.setContext('chrome');
+  await ui("doc.querySelector('#tab-audit').click();doc.querySelector('main .section-title button.primary').click();"); await waitAudit();
+  await assertCounts(decorationCounts, { scanned: 10, passed: 10, failed: 0, manual: 0, small: 0 }, 'Removing masks restores all ellipsis glyphs without treating their zero-width owners as hidden');
+  checks.push('Two intersecting transparent mask regions omit a hidden ellipsis behind a separate expansion control; partial masks, unknown mask shapes and unmasked zero-width glyph overflow remain included, and mask removal restores all text');
+  await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/style-inventory.html`);
+  await driver.setContext('chrome'); await driver.wait(async () => (await read()).pickerDisabled, 10000);
+  await scanClick(); await waitAudit();
+  const workflowCounts = await ui("return doc.querySelector('.metrics').innerText;");
+  assert.equal(await ui("return doc.querySelectorAll('.diagnostic-copy').length;"),0,'Native audit diagnosis actions are hidden by default');
+  await ui("doc.querySelector('#audit-group-results').click();");
+  assert.ok(await ui("return doc.querySelectorAll('.audit-group').length>0;"), 'Matching measurements form real audit groups');
+  assert.equal(await ui("return doc.querySelector('.metrics').innerText;"), workflowCounts, 'Grouping preserves original measurement totals');
+  await ui("doc.querySelector('.audit-group').open=true;");
+  await driver.wait(async () => ui("return doc.querySelectorAll('.audit-group[open] .occurrence-item').length>1;"), 5000);
+  assert.equal(await ui("return doc.querySelectorAll('.diagnostic-copy').length;"),0,'Expanded native audit groups hide diagnosis actions by default');
+  await ui("doc.querySelector('#audit-group-results').click();doc.querySelector('#tab-typography').click();");
+  assert.ok(await ui("return [...doc.querySelectorAll('.font-size-row .inventory-matches')].every(node=>!node.disabled);"), 'Real measured font sizes carry element references');
+  await ui("const item=[...doc.querySelectorAll('.font-usage-item')].find(node=>node.querySelector('.font-chip').textContent.includes('Georgia'));item.querySelector('.font-variants').open=true;");
+  await driver.wait(async()=>ui("return doc.querySelectorAll('.font-variant-row').length>0;"),5000);
+  assert.ok(await ui("return [...doc.querySelectorAll('.font-variant-row')].some(node=>/700/.test(node.textContent)&&/36px/.test(node.textContent));"), 'Computed weight and line height are retained for real text runs');
+  await ui("const item=[...doc.querySelectorAll('.font-usage-item')].find(node=>node.querySelector('.font-chip').textContent.includes('Georgia'));item.querySelector('.font-size-row .inventory-matches').click();");
+  assert.equal(await ui("return doc.querySelectorAll('.inventory-occurrences .occurrence-item').length;"), 1, 'A font-size occurrence list contains the matching heading only');
+  await ui("doc.querySelector('.inventory-occurrences .occurrence-item .actions button:nth-child(2)').click();");
+  await driver.wait(async () => ui("return !!doc.querySelector('.selected-card')&&!!doc.querySelector('.element-text-value');"),10000);
+  assert.equal(await ui("return doc.querySelector('.element-text-value').value;"), 'Inventory small heading');
+  await ui("doc.querySelector('main > .back').click();");
+  assert.equal(await ui("return doc.querySelectorAll('.inventory-occurrences .occurrence-item').length;"),1);
+  await ui("doc.querySelector('main .section-title .back').click();");
+  assert.ok(await ui("return !!doc.querySelector('.font-variants[open]');"), 'Returning to typography retains expanded variant details');
+  await ui("doc.querySelector('#tab-colors').click();const item=[...doc.querySelectorAll('.page-palette .palette-item')].find(node=>node.querySelector('.palette-value').textContent==='#0066CC');item.querySelector('.palette-actions').open=true;");
+  await ui("const item=[...doc.querySelectorAll('.page-palette .palette-item')].find(node=>node.querySelector('.palette-value').textContent==='#0066CC');item.querySelector('.palette-use-text').click();");
+  assert.equal(await ui("return doc.querySelector('#manual-foreground-hex').value;"),'#0066CC');
+  assert.equal(await ui("return !!doc.querySelector('.manual-ratio')&&!doc.querySelector('.selected-card');"),true,'Palette transfer opens the explicitly local calculator with an existing element selection');
+  await ui("doc.querySelector('.manual-return').click();");
+  assert.equal(await ui("return !!doc.querySelector('.selected-card')&&!!doc.querySelector('.palette-actions[open]');"),true,'Returning retains the selected element and palette controls');
+  checks.push('Native usage inventories retain exact element references and computed font variants; font-size occurrences inspect the matching heading and preserve return details, palette colors enter the local calculator without clearing selection, and audit grouping retains totals');
+  await ui("doc.querySelector('#tab-contrast').click();");
+  assert.equal(await ui("return !!doc.querySelector('.diagnostic-copy');"),false,'Native selected-text diagnosis action is hidden by default');
+  await ui("doc.querySelector('.header button').click();");
+  assert.equal(await ui("return doc.querySelector('#show-diagnostics').checked;"),false);
+  await ui("doc.querySelector('#show-diagnostics').click();");
+  await driver.wait(async () => ui("return doc.defaultView.wrappedJSObject.browser.storage.local.get('preferences').then(result=>result.preferences?.values?.showDiagnostics===true);"),5000,'Diagnostic opt-in persists in native local settings');
+  await ui("doc.querySelector('main .section-title .back').click();");
+  assert.equal(await ui("return doc.querySelector('.diagnostic-copy').disabled;"),false);
+  // Force a denied clipboard in this isolated extension document. The real
+  // diagnostic command and DOM capture still run; no system clipboard is read.
+  await ui("const win=doc.defaultView.wrappedJSObject;Object.defineProperty(win.navigator.clipboard,'writeText',{configurable:true,value:Components.utils.exportFunction(()=>{throw new Error('Clipboard denied by test');},win)});doc.querySelector('.diagnostic-copy').click();");
+  await driver.wait(async () => ui("return !!doc.querySelector('.clipboard-fallback');"),10000,'Explicit diagnostic command returns a copyable report');
+  const diagnostic = JSON.parse(await ui("return doc.querySelector('.clipboard-fallback').value;"));
+  assert.equal(diagnostic.kind,'contrast-diagnostic');assert.equal(diagnostic.measurement.source,'selection');
+  assert.equal(diagnostic.browser.name,'Firefox');assert.ok(diagnostic.layers.length>0);assert.ok(diagnostic.measurement.contrast.ratio>1);
+  assert.equal(JSON.stringify(diagnostic).includes('Inventory small heading'),false);assert.equal(JSON.stringify(diagnostic).includes(host.url),false);
+  await ui("delete doc.defaultView.wrappedJSObject.navigator.clipboard.writeText;doc.querySelector('.header button').click();");
+  assert.equal(await ui("return doc.querySelector('#show-diagnostics').checked;"),true,'Reopened settings retain diagnostic opt-in');
+  await ui("doc.querySelector('#show-diagnostics').click();");
+  await driver.wait(async () => ui("return doc.defaultView.wrappedJSObject.browser.storage.local.get('preferences').then(result=>result.preferences?.values?.showDiagnostics===false);"),5000,'Disabling diagnostics persists in native local settings');
+  await ui("doc.querySelector('main .section-title .back').click();");
+  assert.equal(await ui("return !!doc.querySelector('.diagnostic-copy')||!!doc.querySelector('.clipboard-fallback');"),false,'Disabling removes the native diagnostic action and fallback');
+  await ui("doc.querySelector('#tab-audit').click();");
+  assert.equal(await ui("return !!doc.querySelector('.diagnostic-copy');"),false,'Returning to audit keeps diagnostics hidden');
+  checks.push('Native diagnostic controls are hidden by default in audits, groups and selection; explicit settings opt-in persists locally, enables a sanitized diagnostic report with clipboard fallback, and disabling persists and removes the controls and report');
+  }
+  await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/audit-scopes.html`);
+  await driver.setContext('chrome');
+  await driver.findElement(By.id(actionId)).click();
+  await driver.wait(async () => !(await read()).pickerDisabled,10000);
+  await ui("doc.querySelector('#tab-audit').click();");
+  // Observe the ordinary live sidebar protocol in this isolated test process.
+  // Analysis is intentionally absent from storage, and repeated polls must not
+  // trigger handshakes or new measurements. Each real sidebar gets one observer.
+  const liveScopeAudit = () => ui(`
+    const probes=globalThis.__silNativeStateProbes??=new WeakMap();
+    let probe=probes.get(doc);
+    if (!probe) {
+      const api=doc.defaultView.wrappedJSObject.browser;
+      probe={state:null,port:null};probes.set(doc,probe);
+      // Keep the Promise in this privileged test compartment. Returning it from
+      // an extension Promise callback makes Firefox try to assimilate a foreign
+      // thenable that the extension principal is not allowed to inspect.
+      probe.ready=new Promise((resolve,reject)=>{
+        api.windows.getCurrent().then(window=>{
+          try {
+            const port=probe.port=api.runtime.connect({name:'sidebar'});
+            port.onMessage.addListener(message=>{if(message.type==='state'){probe.state=message.state;resolve();}});
+            port.postMessage({type:'ready',windowId:window.id,requestId:'native-live-audit-observer'});
+          } catch(error) { reject(error); }
+        },reject);
+      });
+    }
+    return probe.ready.then(()=>{
+      const state=probe.state,audit=state?.audit;
+      return audit?{id:audit.id,previousId:state.previousAudit?.id,previousRunIds:state.previousAudit?.runs.map(run=>run.id),scope:audit.scope,runs:audit.runs.length,runIds:audit.runs.map(run=>run.id),statuses:audit.runs.map(run=>run.contrast.status),status:audit.status,stale:audit.stale,selectedStale:state.selected?.stale,durationMs:audit.durationMs,examined:audit.examined,rootElementRef:audit.rootElementRef,ratios:audit.runs.map(run=>run.contrast.ratio),viewportPartial:audit.runs.map(run=>run.viewportPartial===true)}:null;
+    });`);
+  const chooseScope = value => ui(`const control=doc.querySelector('#audit-scope');control.value=${JSON.stringify(value)};control.dispatchEvent(new content.Event('change',{bubbles:true}));`);
+  const scanScope = async (scope, runs) => {
+    const previous=(await liveScopeAudit())?.id;
+    await chooseScope(scope); await ui("doc.querySelector('main button.primary').click();");
+    try { await driver.wait(async()=>{const audit=await liveScopeAudit();return audit?.id!==previous&&audit?.scope===scope&&audit?.runs===runs&&audit?.status==='complete';},15000,`Native ${scope} scan completes with ${runs} text runs`); } catch (error) { console.log({scope, audit:await liveScopeAudit(),ui:await read()});throw error;}
+    await waitAudit();const audit=await liveScopeAudit();
+    assert.ok(Number.isFinite(audit.durationMs)&&audit.durationMs>=0);
+    assert.ok(audit.examined>0);
+    assert.ok(await ui("return !!doc.querySelector('.audit-runtime');"));
+    return audit;
+  };
+  await scanScope('viewport',3);
+  const pageScopeAudit=await scanScope('page',4);
+  await chooseScope('viewport');
+  assert.equal((await liveScopeAudit()).id,pageScopeAudit.id,'Changing scope alone does not start an audit');
+  await ui("doc.querySelector('.picker').click();");
+  await driver.setContext('content');
+  const sectionPoint=await driver.executeScript("const rect=document.getElementById('section').getBoundingClientRect();return {x:Math.round(rect.left+3),y:Math.round(rect.top+3)};");
+  await driver.actions().move({origin:'viewport',...sectionPoint}).press().release().perform();
+  await driver.setContext('chrome');
+  await driver.wait(async()=>ui("return doc.querySelector('.selected-card .tag')?.textContent==='<section>';"),10000);
+  await ui("doc.querySelector('#tab-audit').click();");
+  const sectionAudit=await scanScope('selection',2);
+  assert.ok(sectionAudit.rootElementRef,'A selected-section scan retains its root for an explicit rescan');
+  const rescannedSection=await scanScope('selection',2);
+  assert.ok(rescannedSection.rootElementRef,'An explicit rescan retains a reference to the same section after rebuilding the registry');
+  await driver.setContext('content');await driver.executeScript("document.getElementById('first').style.color='#aaaaaa';");
+  await driver.setContext('chrome');
+  await ui("doc.querySelector('.finding .actions button:nth-child(2)').click();");
+  await driver.wait(async()=>ui("return !!doc.querySelector('.measurement-comparison');"),10000,'Audit and later inspection have an explicit comparison');
+  assert.deepEqual((await liveScopeAudit()).ratios,rescannedSection.ratios,'The comparison preserves historical audit ratios');
+  await ui("doc.querySelector('#tab-audit').click();");
+  await driver.setContext('content');await driver.executeScript("document.getElementById('section').remove();");
+  await driver.setContext('chrome');
+  await chooseScope('selection');
+  const beforeRejectedSection=await liveScopeAudit();
+  const rejectedSectionMetrics=await ui("return doc.querySelector('.metrics').textContent;");
+  // Permission is already granted. Dispatch against the current control so a
+  // stale-state rerender cannot detach it between pointer-down and pointer-up.
+  await ui("doc.querySelector('main button.primary').click();");
+  try { await driver.wait(async()=>ui("return /removed|entfernt|available|verfügbar/i.test(doc.querySelector('.toast')?.textContent??'');"),10000,'Removed section roots fail explicitly'); }
+  catch (error) { console.log({removedSectionAudit:await liveScopeAudit(),body:await ui('return doc.body.innerText;')});throw error; }
+  const afterRejectedSection=await liveScopeAudit();
+  assert.equal(afterRejectedSection.id,beforeRejectedSection.id,'A rejected section start retains the prior audit');
+  assert.equal(afterRejectedSection.previousId,beforeRejectedSection.previousId,'Rejection does not rotate the previous complete baseline');
+  assert.deepEqual(afterRejectedSection.ratios,beforeRejectedSection.ratios);
+  assert.equal(await ui("return doc.querySelector('.metrics').textContent;"),rejectedSectionMetrics,'The original metrics remain available after the rejected start');
+  checks.push('Native page/viewport/selected-section audits preserve explicit scope, duration and limits; scope changes do not scan; selected roots can be rescanned and removed roots fail without discarding results or rotating history; later inspection compares exact text areas without rewriting historical ratios');
+  await driver.setContext('content');await driver.get(`${host.url}/tests/fixtures/viewport-edge-overlap.html`);
+  assert.ok(await driver.executeScript("const r=document.querySelector('#covered').getBoundingClientRect();return r.left<innerWidth&&r.left+r.width/2>innerWidth;"),'The long text intersects the viewport while its center lies outside');
+  await driver.setContext('chrome');await driver.findElement(By.id(actionId)).click();
+  await driver.wait(async()=>!(await read()).pickerDisabled,10000);await ui("doc.querySelector('#tab-audit').click();");
+  const edgeAudit=await scanScope('page',2);
+  assert.deepEqual(edgeAudit.ratios,[null,21],'Visible overlap cannot be skipped because the full text center is offscreen');
+  assert.equal(await ui("return doc.querySelector('[data-rule=contrast] .metric-count.manual .metric-count-value').textContent;"),'1');
+  await driver.setContext('content');await driver.executeScript("document.querySelector('#cover').remove();");
+  await driver.setContext('chrome');
+  assert.deepEqual((await scanScope('page',2)).ratios,[21,21],'Removing the actual cover restores both measurable backgrounds');
+  checks.push('Partly visible wide text is sampled inside the viewport: actual overlapping surfaces stay unassessed, uncovered text remains measured and removing the cover restores both ratios');
+  await driver.setContext('content');await driver.get(`${host.url}/tests/fixtures/audit-scopes.html`);
+  await driver.executeScript("document.getElementById('first').style.color='#aaaaaa';document.getElementById('below').style.color='#aaaaaa';");
+  await driver.setContext('chrome');await driver.findElement(By.id(actionId)).click();
+  await driver.wait(async()=>!(await read()).pickerDisabled,10000);await ui("doc.querySelector('#tab-audit').click();");
+  const comparisonBaseline=await scanScope('page',4);
+  assert.deepEqual(comparisonBaseline.statuses,['pass','fail','pass','fail']);
+  assert.ok(!comparisonBaseline.previousId,'A new document does not inherit a former document baseline');
+  await driver.setContext('content');
+  await driver.executeScript("document.getElementById('first').style.color='#111111';document.getElementById('second').style.color='#aaaaaa';document.getElementById('below').remove();");
+  await driver.setContext('chrome');
+  const comparisonCurrent=await scanScope('page',3);
+  assert.deepEqual(comparisonCurrent.runIds,comparisonBaseline.runIds.slice(0,3),'Successive manual audits retain the identities of the actual surviving Text nodes');
+  assert.equal(comparisonCurrent.previousId,comparisonBaseline.id);
+  assert.deepEqual(comparisonCurrent.previousRunIds,comparisonBaseline.runIds,'Removed text remains historical evidence in the preceding complete audit');
+  const readDiffCounts=()=>ui("return Object.fromEntries([...doc.querySelectorAll('.audit-diff [data-change-filter]')].map(node=>[node.dataset.changeFilter,Number(node.textContent.match(/\\(([^)]*)\\)$/)[1].replace(/\\D/g,''))]));");
+  await ui("doc.querySelector('.audit-diff').open=true;");
+  await driver.wait(async()=>Object.keys(await readDiffCounts()).length===5,10000,'The native audit comparison is populated');
+  assert.deepEqual(await readDiffCounts(),{all:3,new:1,resolved:1,persistent:0,unassessed:1},'Fail-to-pass, pass-to-fail and removed failing text have distinct outcomes');
+  await ui("doc.querySelector('.audit-diff [data-change-filter=unassessed]').click();");
+  assert.equal(await ui("return doc.querySelectorAll('.audit-diff-item').length;"),1);
+  assert.equal(await ui("return doc.querySelectorAll('.audit-diff-item button').length;"),0,'Removed text is neither reported as repaired nor offered as a current inspection target');
+  await driver.setContext('content');await driver.executeScript("document.getElementById('second').style.color='#111111';");
+  await driver.setContext('chrome');
+  const comparisonThird=await scanScope('page',3);
+  assert.equal(comparisonThird.previousId,comparisonCurrent.id,'The next accepted scan rotates to the immediately preceding complete audit');
+  assert.deepEqual(comparisonThird.previousRunIds,comparisonCurrent.runIds);
+  assert.deepEqual(comparisonThird.runIds,comparisonCurrent.runIds);
+  await ui("doc.querySelector('.audit-diff').open=true;");
+  await driver.wait(async()=>Object.keys(await readDiffCounts()).length===5,10000);
+  assert.deepEqual(await readDiffCounts(),{all:1,new:0,resolved:1,persistent:0,unassessed:0},'The rotated baseline does not repeatedly report already repaired or formerly removed text');
+  checks.push('Two manual audit snapshots preserve actual Text identities and classify newly failing, repaired and removed findings separately; removed nodes are not claimed as repaired, and each next complete scan rotates the comparison baseline');
+  await driver.setContext('content'); await driver.get(`${host.url}/tests/fixtures/viewport-text-fragments.html`);
+  const fragmentGeometry=await driver.executeScript("const range=document.createRange();range.selectNodeContents(document.querySelector('p'));return {tops:[...range.getClientRects()].filter(rect=>rect.width>0&&rect.height>0).map(rect=>rect.top),height:innerHeight};");
+  assert.ok(fragmentGeometry.tops.some(top=>top>=0&&top<fragmentGeometry.height)&&fragmentGeometry.tops.some(top=>top>fragmentGeometry.height));
+  await driver.setContext('chrome');await driver.findElement(By.id(actionId)).click();
+  await driver.wait(async()=>!(await read()).pickerDisabled,10000);await ui("doc.querySelector('#tab-audit').click();");
+  const fragmentAudit=await scanScope('viewport',1);
+  assert.deepEqual(fragmentAudit.viewportPartial,[true]);assert.equal(fragmentAudit.stale,false);
+  assert.equal(fragmentAudit.ratios[0],21);
+  await ui("doc.querySelector('.finding .actions button:nth-child(2)').click();");
+  await driver.wait(async()=>ui("return !!doc.querySelector('.measurement-comparison .audit-viewport-partial');"),10000,'Different text-fragment scopes are explained');
+  await driver.wait(async()=>{const audit=await liveScopeAudit();return audit?.selectedStale===false;},10000);
+  const inspectedFragmentAudit=await liveScopeAudit();
+  assert.equal(inspectedFragmentAudit.stale,false,'Unchanged full-element inspection does not invalidate a viewport-only measurement');
+  assert.deepEqual(inspectedFragmentAudit.ratios,fragmentAudit.ratios);
+  checks.push('Partly visible multiline text retains explicit viewport-fragment evidence; full-element inspection explains differing background assessment without falsely invalidating the unchanged audit');
+  // Use two actual browser windows/extension ports, rather than simulating
+  // window IDs in the background integration harness.
+  await ui("doc.querySelector('#tab-audit').click();");
+  const firstWindowMetrics=await ui("return doc.querySelector('.metrics').textContent;");
+  await driver.setContext('content');const firstWindow=await driver.getWindowHandle();
+  await driver.switchTo().newWindow('window');const secondWindow=await driver.getWindowHandle();
+  await driver.get(`${host.url}/tests/fixtures/audit-scopes.html`);
+  await driver.setContext('chrome');
+  await driver.wait(until.elementLocated(By.id(actionId)),15000);
+  await driver.findElement(By.id(actionId)).click();
+  await driver.wait(async()=>driver.executeScript('return !!document.getElementById("sidebar")?.contentDocument?.getElementById("webext-panels-browser")?.messageManager;'),15000);
+  await driver.wait(async()=>ui("return !!doc.querySelector('#tab-audit')&&!doc.querySelector('.picker').disabled;"),10000);
+  assert.equal(await ui("return !!doc.querySelector('.metrics');"),false,'A new window does not inherit another document audit');
+  await scanScope('page',4);
+  const secondWindowMetrics=await ui("return doc.querySelector('.metrics').textContent;");
+  assert.notEqual(secondWindowMetrics,firstWindowMetrics);
+  await ui("doc.querySelector('header .icon-button').click();const appearance=doc.querySelector('select option[value=dark]').parentElement;appearance.value='dark';appearance.dispatchEvent(new content.Event('change',{bubbles:true}));");
+  await driver.wait(async()=>ui("return doc.documentElement.dataset.theme==='dark';"),10000);
+  await driver.setContext('content');await driver.switchTo().window(firstWindow);await driver.setContext('chrome');
+  await driver.wait(async()=>ui("return doc.documentElement.dataset.theme==='dark';"),10000,'Preferences propagate to the other real window');
+  assert.equal(await ui("return doc.querySelector('.metrics').textContent;"),firstWindowMetrics,'Separate audit results survive other-window scans and preference changes');
+  await driver.setContext('content');await driver.switchTo().window(secondWindow);await driver.setContext('chrome');
+  await ui("doc.querySelector('.analyses-overview > button').click();");
+  await driver.wait(async()=>ui("return doc.querySelectorAll('.analysis-entry').length===2;"),10000,'The real session overview lists both retained tab analyses');
+  assert.equal(await ui("return [...doc.querySelectorAll('.analysis-entry')].filter(node=>node.querySelector('.analysis-title').textContent==='Audit scope fixture').length;"),1);
+  await ui("const row=[...doc.querySelectorAll('.analysis-entry')].find(node=>node.querySelector('.analysis-title').textContent==='Audit scope fixture');row.querySelector('button.danger').click();");
+  assert.equal(await ui("return doc.querySelectorAll('.analysis-entry .confirm-box').length;"),1,'Deleting one tab requires confirmation in its row');
+  await ui("doc.querySelector('.analysis-entry .confirm-box .danger').click();");
+  await driver.wait(async()=>ui("return doc.querySelectorAll('.analysis-entry').length===1 && !doc.querySelector('.analyses-overview > button').disabled;"),10000);
+  await ui("doc.querySelector('#tab-audit').click();");
+  assert.equal(await ui("return !!doc.querySelector('.metrics')||!!doc.querySelector('.selected-card');"),false,'Deleting the current tab clears its audit and selection');
+  await driver.setContext('content');await driver.switchTo().window(firstWindow);await driver.setContext('chrome');
+  assert.equal(await ui("return doc.querySelector('.metrics').textContent;"),firstWindowMetrics,'Deleting another tab leaves this tab analysis unchanged');
+  await driver.setContext('content');await driver.switchTo().window(secondWindow);await driver.setContext('chrome');
+  await scanScope('page',4);
+  await ui("doc.querySelector('header .icon-button').click();");
+  checks.push('The native saved-analysis overview lists both real tabs; confirming one-tab deletion clears only that tab, preserves the other window audit and permits a fresh manual scan');
+  await ui("doc.querySelector('main .danger').click();doc.querySelector('.confirm-box .danger').click();");
+  await ui("doc.querySelector('#tab-audit').click();");
+  await driver.wait(async()=>ui("return !doc.querySelector('.metrics')&&!doc.querySelector('.selected-card');"),10000);
+  await driver.setContext('content');await driver.switchTo().window(firstWindow);await driver.setContext('chrome');
+  await driver.wait(async()=>ui("return !doc.querySelector('.metrics')&&!doc.querySelector('.selected-card');"),10000,'Clearing analyses reaches every real window');
+  await driver.setContext('content');await driver.switchTo().window(secondWindow);await driver.setContext('chrome');
+  await ui("doc.querySelector('.picker').click();");
+  await driver.setContext('content');await driver.wait(until.elementLocated(By.css('[data-style-inspector-overlay]')),10000);
+  await driver.close();await driver.switchTo().window(firstWindow);await driver.setContext('chrome');
+  await driver.wait(async()=>ui("return !doc.querySelector('.picker').disabled&&doc.querySelector('.picker').getAttribute('aria-pressed')==='false';"),10000);
+  await scanScope('viewport',1);
+  checks.push('Two real Firefox windows keep separate audits, propagate appearance changes and clearing analyses, and closing a window with an active picker leaves the remaining window functional');
+  const authorizationState=await ui("return doc.defaultView.wrappedJSObject.browser.storage.session.get('analysisSession').then(result=>result.analysisSession);");
+  assert.equal(authorizationState.schemaVersion,2);
+  assert.ok(Object.keys(authorizationState.documents).length>0);
+  for (const record of Object.values(authorizationState.documents)) {
+    assert.deepEqual(Object.keys(record).sort(),['documentToken','tabId','touchedAt','windowId'],'Session storage contains only access metadata, never measurements or comparison history');
+  }
+  const priorReloadId=(await liveScopeAudit()).id;
+  await driver.setContext('content');await driver.navigate().refresh();await driver.setContext('chrome');
+  await driver.wait(async()=>!(await liveScopeAudit())&&await ui("return !doc.querySelector('.metrics')&&!doc.querySelector('.selected-card');"),10000,'Reload drops current results and their comparison baseline');
+  await driver.findElement(By.id(actionId)).click();
+  await driver.wait(async()=>!(await read()).pickerDisabled,10000);
+  assert.equal(await liveScopeAudit(),null,'Activating the reloaded page does not automatically start an audit');
+  const reloadedAudit=await scanScope('viewport',1);
+  assert.notEqual(reloadedAudit.id,priorReloadId);
+  assert.ok(!reloadedAudit.previousId,'The new page never inherits a pre-reload comparison baseline');
+  checks.push('Analysis and comparison history stay out of browser storage; reloading drops results, activation does not scan, and only an explicit new scan creates a fresh baseline');
   await driver.setContext('content'); await driver.get('about:config');
   await driver.setContext('chrome');
   await driver.wait(async () => (await read()).pickerDisabled,10000);
@@ -1380,7 +1714,7 @@ try {
   await driver.wait(async () => ui("return !doc.querySelector('.metrics') && doc.querySelector('main button.primary')?.disabled;"),10000);
   checks.push('Protected Firefox pages stay unscannable despite optional website permission');
   await mkdir(path.join(root, 'test-results'), { recursive: true });
-  await writeFile(path.join(root, 'test-results', `firefox-${version}.json`), JSON.stringify({ version, checks, limitations: ['Optional download save dialog and multi-window interactive edge cases still require manual verification.'] }, null, 2));
+  await writeFile(path.join(root, 'test-results', `firefox-${version}.json`), JSON.stringify({ version, checks, limitations: ['Optional download save dialogs, signed-package behavior and prolonged use in a real logged-in browser session still require manual verification.'] }, null, 2));
   console.log(JSON.stringify({ version, checks }, null, 2));
 } catch (error) {
   console.log({ completedChecks: checks.length, lastCheck: checks.at(-1) });

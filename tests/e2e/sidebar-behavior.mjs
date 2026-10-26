@@ -10,6 +10,7 @@ import { serve, root, defaults, message } from './support.mjs';
 const { fixtureRun, fixtureSnapshot, fixtureAudit } = await tsImport('../fixtures/export/data.ts', import.meta.url);
 const { serializeExport } = await tsImport('../../src/core/exports.ts', import.meta.url);
 const { cssColorContrast, evaluateRun } = await tsImport('../../src/core/contrast.ts', import.meta.url);
+const { parseColor } = await tsImport('../../src/core/colors.ts', import.meta.url);
 const host = await serve();
 const browser = await chromium.launch({ channel: process.env.UI_BROWSER_CHANNEL ?? 'msedge', headless: true });
 const errors = [];
@@ -97,7 +98,7 @@ try {
     }
     await page.locator('.page-palette').screenshot({ path: path.join(root, `test-results/palette-layout-${locale}.png`) });
     for (const value of ['#FFFFFF', '#00000000']) {
-      await page.locator('.page-palette .palette-item').filter({ hasText: value }).getByRole('button').click();
+      await page.locator('.page-palette .palette-item').filter({ hasText: value }).locator(':scope > .icon-button').click();
       assert.equal(await page.evaluate(() => window.__copied), value, 'Copy matches the uppercase visible value');
     }
     await page.setViewportSize({ width: 380, height: 800 });
@@ -164,7 +165,7 @@ try {
       const paletteTile = page.locator('.page-palette .palette-item').filter({ hasText: expected });
       assert.equal(await paletteTile.count(), 1);
       assert.equal(await paletteTile.locator(':scope > span:not(.swatch)').getAttribute('title'), colorFormat === 'hex' ? message(catalog, 'colorRoundedHex', [exactAmazonRGB]) : '', 'Palette colors explain the same rounded HEX value');
-      await paletteTile.getByRole('button').click();
+      await paletteTile.locator(':scope > .icon-button').click();
       assert.equal(await page.evaluate(() => window.__copied), expected, 'A palette copy matches the displayed value');
       assert.ok(await page.locator('.content').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Fractional colors fit a 280px sidebar');
       assert.deepEqual(await page.evaluate(() => ({ selected: window.__state.selected, audit: window.__state.audit })), { selected: amazonSnapshot, audit: amazonAudit }, 'Display formats and copying do not mutate numeric measurements');
@@ -1002,7 +1003,7 @@ try {
     assert.equal(await page.locator('.content').evaluate(node => node.scrollTop), 0);
     assert.equal(await page.evaluate(() => window.__state.selected), null);
     assert.equal(await page.evaluate(() => window.__state.audit), null);
-    await page.evaluate(audit => window.__emit({ audit: { ...audit, id: 'refreshed-audit', stale: false }, lastEvent: 'audit' }), audit);
+    await page.evaluate(audit => window.__emit({ audit: { ...audit, id: window.__commands.filter(command => command.type === 'start-audit').at(-1).requestId, stale: false }, lastEvent: 'audit' }), audit);
     assert.equal(await page.locator('.filter-bar button[data-filter="all"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('.finding').count(), 4);
     assert.equal(await auditSimulation.getAttribute('open'), null);
@@ -1051,12 +1052,12 @@ try {
       assert.equal(overviewHeaderFits, true, `${locale}/${tab}: the overview title and rescan button fit inside the narrow card`);
       await page.setViewportSize({ width: 380, height: 800 });
       if (tab === 'colors') {
-        assert.equal(await page.locator('.page-palette .palette-item').count(), pageAudit.palette.length);
+        assert.equal(await page.locator('.page-palette .palette-item').count(), 3, 'CSS aliases share one palette tile; gray, white and transparent remain');
         const tile = page.locator('.page-palette .palette-item').first();
-        await tile.getByRole('button').click();
+        await tile.locator(':scope > .icon-button').click();
         assert.equal(await page.evaluate(() => window.__copied), await tile.locator(':scope > span:not(.swatch)').textContent());
       } else {
-        assert.deepEqual(await page.locator('.font-chip').allTextContents(), pageAudit.fonts);
+        assert.deepEqual(await page.locator('.font-chip').allTextContents(), [...pageAudit.fonts].sort((a, b) => a.toLowerCase() < b.toLowerCase() ? -1 : 1), 'Legacy font lists use a stable name order without invented usage counts');
         assert.ok((await page.locator('.content').textContent()).includes(label('pageFontsHelp')));
         await page.setViewportSize({ width: 280, height: 800 });
         assert.ok(await page.locator('.content').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'A long CSS fallback stack fits a narrow sidebar');
@@ -1064,7 +1065,7 @@ try {
       }
       await overviewCopy.click();
       const settings = await page.evaluate(() => window.__state.settings);
-      assert.equal(await page.evaluate(() => window.__copied), serializeExport({ kind: 'page-tokens', audit: pageAudit }, { version: '1.0.0', format: 'css', scope: 'all', colorFormat: settings.colorFormat, target: settings.contrastTarget }).text);
+      assert.equal(await page.evaluate(() => window.__copied), serializeExport({ kind: 'page-tokens', audit: pageAudit }, { version: '1.0.0', format: 'css', scope: 'all', colorFormat: settings.colorFormat, target: settings.contrastTarget, inventory: 'measured' }).text);
       await overviewExport.click();
       assert.equal(await page.getByLabel(label('exportSource')).inputValue(), 'page-tokens');
       assert.equal(await page.getByLabel(label('exportFormat'), { exact: true }).inputValue(), 'css');
@@ -1080,6 +1081,80 @@ try {
       await page.getByRole('button', { name: label('actionBack'), exact: true }).click();
     }
     assert.equal(await page.evaluate(() => window.__commands.length), overviewCommands, 'Viewing/copying/exporting page styles requests no scan or element selection');
+
+    // Inventory order is a display choice. Raw page-token order and frozen
+    // export bytes stay independent from usage counts, roles and UI sorting.
+    const inventoryState = await page.evaluate(() => structuredClone(window.__state));
+    const inventoryAudit = { ...pageAudit, id: 'inventory-overview', palette: ['#0066CC', '#FFFFFF', '#000000', '#CC0000', '#00000000', 'rgb(255 255 255)'].map(parseColor),
+      paletteUsage: [
+        { color: parseColor('#0066CC'), count: 6, roles: { text: 2, accent: 4 } },
+        { color: parseColor('#FFFFFF'), count: 20, roles: { background: 20, text: 1 } },
+        { color: parseColor('#000000'), count: 8, roles: { text: 8 } },
+        { color: parseColor('#CC0000'), count: 11, roles: { accent: 11 } },
+        { color: parseColor('#00000000'), count: 30, roles: { other: 30 } },
+      ],
+      fontUsage: [
+        { family: pageAudit.fonts[1], count: 3, sizes: [{ sizeCssPx: null, count: 1 }, { sizeCssPx: 14.5, count: 2 }] },
+        { family: pageAudit.fonts[0], count: 20, sizes: [{ sizeCssPx: 32, count: 1 }, { sizeCssPx: 12, count: 7 }, { sizeCssPx: 16, count: 12 }] },
+        { family: pageAudit.fonts[2], count: 2, sizes: [{ sizeCssPx: 13.5, count: 2 }] },
+      ] };
+    const inventoryBefore = JSON.stringify(inventoryAudit);
+    const inventoryColors = () => page.locator('.page-palette .palette-value').allTextContents();
+    const expectedInventory = {
+      usage: ['#FFFFFF', '#000000', '#0066CC', '#CC0000', '#00000000'],
+      frequency: ['#FFFFFF', '#CC0000', '#000000', '#0066CC', '#00000000'],
+      hue: ['#FFFFFF', '#000000', '#CC0000', '#0066CC', '#00000000'],
+    };
+    const inventoryCommandCount = await page.evaluate(() => window.__commands.length);
+    for (const appearance of ['light', 'dark']) {
+      await page.evaluate(({ audit, appearance }) => window.__emit({ selected: null, preview: null, audit, settings: { ...window.__state.settings, appearance, colorFormat: 'hex' }, lastEvent: 'audit' }), { audit: inventoryAudit, appearance });
+      await page.setViewportSize({ width: 280, height: 800 });
+      await page.locator('#tab-colors').click();
+      assert.equal(await page.getByLabel(label('paletteSort')).getAttribute('id'), 'palette-sort');
+      assert.deepEqual(await page.locator('#palette-sort option').allTextContents(), [label('paletteSortUsage'), label('paletteSortFrequency'), label('paletteSortHue')]);
+      for (const sort of ['usage', 'frequency', 'hue']) {
+        await page.locator('#palette-sort').selectOption(sort);
+        assert.deepEqual(await inventoryColors(), expectedInventory[sort], `${locale}/${appearance}/${sort}: stable independently expected order`);
+        assert.equal(await page.locator('.palette-group-title').count(), sort === 'usage' ? 4 : 0);
+        if (sort === 'usage') assert.deepEqual(await page.locator('.palette-group-title').allTextContents(), [label('paletteRoleBackground') + ' (1)', label('paletteRoleText') + ' (2)', label('paletteRoleAccent') + ' (1)', label('paletteRoleOther') + ' (1)']);
+        const white = page.locator('.palette-item').filter({ has: page.locator('.palette-value', { hasText: /^#FFFFFF$/ }) });
+        assert.equal(await white.locator(':scope > .icon-button').count(), 1, 'One dedicated copy action remains alongside palette workflow actions');
+        assert.equal(await white.locator('.inventory-frequency').getAttribute('aria-label'), message(catalog, 'inventoryElementCount', ['20']));
+        assert.equal(await white.locator('.palette-roles').textContent(), label('paletteRoleBackground') + ' · ' + label('paletteRoleText'));
+        await white.locator(':scope > .icon-button').click();
+        assert.equal(await page.evaluate(() => window.__copied), '#FFFFFF', 'Copying a color excludes roles and frequency');
+        await overviewCopy.click();
+        assert.equal(await page.evaluate(() => window.__copied), serializeExport({ kind: 'page-tokens', audit: inventoryAudit }, { version: '1.0.0', format: 'css', scope: 'all', colorFormat: 'hex', target: inventoryState.settings.contrastTarget, inventory: 'measured' }).text, 'Palette display sorting never reorders generated tokens');
+        assert.ok(await page.locator('.content').evaluate(node => node.scrollWidth <= node.clientWidth + 1), `${appearance}/${sort}: counts, group headings and sorting fit 280 CSS px`);
+      }
+      await page.locator('#tab-typography').click();
+      assert.deepEqual(await page.locator('.font-chip').allTextContents(), [pageAudit.fonts[0], pageAudit.fonts[1], pageAudit.fonts[2]], 'Font stacks follow element frequency');
+      const sans = page.locator('.font-usage-item').first();
+      assert.equal(await sans.locator('.font-usage-heading .inventory-frequency').getAttribute('aria-label'), message(catalog, 'inventoryElementCount', ['20']));
+      assert.deepEqual(await sans.locator('.font-size-row > span:first-child').allTextContents(), [16, 12, 32].map(value => message(catalog, 'fontCssSize', [String(value)])));
+      assert.deepEqual(await sans.locator('.font-size-row .inventory-frequency').allTextContents(), [12, 7, 1].map(value => message(catalog, 'inventoryFrequency', [String(value)])));
+      const mono = page.locator('.font-usage-item').nth(1);
+      assert.deepEqual(await mono.locator('.font-size-row > span:first-child').allTextContents(), [message(catalog, 'fontCssSize', [locale === 'de' ? '14,5' : '14.5']), label('fontSizeUnknown')]);
+      const fontRows = await sans.locator('.font-size-row').evaluateAll(nodes => nodes.map(node => ({ display: getComputedStyle(node).display, top: node.getBoundingClientRect().top, bottom: node.getBoundingClientRect().bottom })));
+      assert.ok(fontRows.every((row, index) => index === 0 || row.top >= fontRows[index - 1].bottom), 'Font sizes occupy separate vertical list rows');
+      assert.ok(await page.locator('.content').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Font families, counts and size lists fit the narrow sidebar');
+      await page.locator('#tab-colors').click();
+      assert.equal(await page.locator('#palette-sort').inputValue(), 'hue', 'Changing tabs retains the local sorting choice');
+      await page.evaluate(audit => window.__emit({ audit: { ...audit, stale: true }, lastEvent: 'stale' }), inventoryAudit);
+      assert.deepEqual(await inventoryColors(), expectedInventory.hue, 'Stale snapshots retain their inventory and explicit stale warning');
+      assert.ok((await page.locator('.page-overview').textContent()).includes(label('statusStale')));
+      await overviewExport.click();
+      const frozenInventory = await page.locator('.code-preview').textContent();
+      await page.evaluate(audit => window.__emit({ audit: { ...audit, paletteUsage: [], fontUsage: [] }, lastEvent: 'audit' }), inventoryAudit);
+      assert.equal(await page.locator('.code-preview').textContent(), frozenInventory, 'New usage metadata cannot alter a reviewed export');
+      await page.getByRole('button', { name: label('actionBack'), exact: true }).click();
+    }
+    assert.equal(await page.evaluate(() => window.__commands.length), inventoryCommandCount, 'Display sort, theme fixture updates, copying and exports issue no page commands');
+    assert.equal(JSON.stringify(inventoryAudit), inventoryBefore);
+    await page.setViewportSize({ width: 380, height: 800 });
+    await page.evaluate(state => window.__emit({ ...state, lastEvent: 'ready' }), inventoryState);
+    await page.locator('#tab-colors').click(); await page.locator('#palette-sort').selectOption('usage');
+    await page.locator('#tab-typography').click();
 
     // A reviewed page-token draft stays frozen when a later audit arrives.
     await overviewExport.click();
@@ -1479,7 +1554,7 @@ try {
       assert.equal(await foregroundHex.inputValue(), '#AABBCC', 'Blur expands a valid shorthand to uppercase six-digit HEX');
       const lastPicker = await paletteState();
       const lastSwatch = await foregroundPicker.locator('.manual-color-swatch > span').evaluate(node => getComputedStyle(node).backgroundColor);
-      for (const invalid of ['', '#', '#12', '#1234', '#12345', '#1234567', '#12345678', '#GGGGGG', 'red', 'rgb(0,0,0)']) {
+      for (const invalid of ['', '#', '#12', '#12345', '#1234567', '#GGGGGG', 'red', 'rgb(0,0)', 'var(--color)']) {
         await foregroundHex.fill(invalid);
         assert.equal(await foregroundHex.getAttribute('aria-invalid'), 'true', invalid);
         const describedBy = await foregroundHex.getAttribute('aria-describedby');

@@ -5,7 +5,7 @@ import { number, t } from './i18n';
 export interface ColorPicker { button: HTMLButtonElement; panel: HTMLDivElement; setColor: (hex:string)=>void; close: (focus?:boolean)=>void }
 let active:ColorPicker|null=null;
 export function closeActiveColorPicker(focus=false):boolean{if(!active)return false;active.close(focus);return true;}
-export function createColorPicker(side:'foreground'|'background',label:string,onChange:(hex:string)=>void):ColorPicker {
+export function createColorPicker(side:'foreground'|'background'|'underlay',label:string,onChange:(hex:string)=>void):ColorPicker {
   let hex=side==='foreground'?'#000000':'#FFFFFF',color:HSV=rgbToHsv(parseManualHex(hex)!.rgba),pointer:number|null=null,pointerBox:DOMRect|null=null;
   const button=document.createElement('button');button.type='button';button.id=`manual-${side}-picker`;button.className='manual-picker-button';button.setAttribute('aria-expanded','false');
   const swatch=document.createElement('span');swatch.className='manual-color-swatch swatch';swatch.setAttribute('aria-hidden','true');const fill=document.createElement('span');swatch.append(fill);button.append(swatch);

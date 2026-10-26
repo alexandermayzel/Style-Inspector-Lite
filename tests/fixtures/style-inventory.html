@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Measured style inventory fixture</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 24px; color: #000; font: 16px/1.5 Arial, sans-serif; }
+  .row { display: block; margin: 10px 0; }
+  .surface { background: #f0f0f0; padding: 8px; }
+  .caption { color: #666; font-size: 12px; }
+  .heading { color: #222; font-family: Georgia, serif; }
+  #heading-small { font-size: 24px; }
+  #heading-large { font-size: 32px; }
+  #split { font-size: 14px; }
+  a { color: #0066cc; }
+  button { color: white; background: #0066cc; border: 0; padding: 8px; font: inherit; }
+  #glyph { -webkit-text-fill-color: #990000; }
+  #alpha { color: white; background: rgb(0 0 0 / 50%); padding: 8px; }
+</style>
+<p id="body-a" class="row">Inventory plain text</p>
+<p id="split" class="row">First fragment<!-- Separate measured text node. --> second fragment</p>
+<section class="surface">
+  <p id="caption-a" class="row caption">Inventory caption one</p>
+  <p id="caption-b" class="row caption">Inventory caption two</p>
+  <h2 id="heading-small" class="row heading">Inventory small heading</h2>
+</section>
+<h1 id="heading-large" class="row heading">Inventory large heading</h1>
+<a href="#local"><span id="link" class="row">Inventory link</span></a>
+<div class="row"><button id="button">Inventory button</button></div>
+<div class="row"><button><span id="nested-button">Inventory nested label</span></button></div>
+<p id="glyph" class="row">Inventory painted foreground</p>
+<p id="alpha" class="row">Inventory translucent surface</p>
+</html>

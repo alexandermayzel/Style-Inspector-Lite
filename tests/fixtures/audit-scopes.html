@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Audit scope fixture</title>
+<style>
+  html { background: white; color: #111; font: 16px/24px Arial, sans-serif; }
+  body { margin: 16px; }
+  p { margin: 0; }
+  #section { width: 280px; padding: 12px; background: #eee; }
+  #below { margin-top: 2200px; }
+  #hidden { display: none; }
+</style>
+<p id="outside">Visible outside the selected section</p>
+<section id="section"><p id="first">First section label</p><p id="second">Second section label</p></section>
+<p id="hidden">Hidden text never belongs to the audit</p>
+<p id="below">Text below the initial viewport</p>
+</html>

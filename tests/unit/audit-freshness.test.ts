@@ -47,6 +47,17 @@ test('text fill presence invalidates matching colors when the correction export 
   assert.equal(auditMeasurementsChanged(fixtureAudit([run]), fixtureSnapshot({ ...run, textFillPresent: false })), false, 'Absent optional metadata means no observed fill property');
 });
 
+test('font-family and line-height changes refresh inventories even when contrast measurements stay equal', () => {
+  const run = { ...fixtureRun('#666', '#fff', 16), fontFamily: 'Arial, sans-serif', lineHeight: '24px' };
+  const audit = fixtureAudit([run]);
+  assert.equal(auditMeasurementsChanged(audit, fixtureSnapshot({ ...run })), false);
+  for (const change of [{ fontFamily: 'Georgia, serif' }, { lineHeight: 'normal' }, { lineHeight: '32px' }]) {
+    const snapshot = fixtureSnapshot({ ...run, ...change });
+    assert.equal(snapshot.textRuns[0].contrast.ratio, audit.runs[0].contrast.ratio);
+    assert.equal(auditMeasurementsChanged(audit, snapshot), true);
+  }
+});
+
 test('running scans detect contradictions only in already measured inputs', () => {
   const run = fixtureRun('#666', '#fff', 16), audit = { ...fixtureAudit([run]), status: 'running' as const };
   assert.equal(auditMeasurementsChanged(audit, fixtureSnapshot({ ...run, reasons: ['overlapping-element'] })), true);
@@ -70,6 +81,44 @@ test('stale selections and different documents cannot reconcile audit freshness'
     if (key === 'documentToken') foreign.document[key] += '-different'; else foreign.document[key]++;
     assert.equal(auditMeasurementsChanged(audit, foreign), false);
   }
+});
+
+test('viewport audits compare shared measurements without inferring changes from intentional omissions', () => {
+  const run = fixtureRun('#666', '#fff', 16);
+  const audit = { ...fixtureAudit([run]), scope: 'viewport' as const };
+  const snapshot = fixtureSnapshot(run);
+  snapshot.textRuns.push({ ...run, id: 'offscreen-direct-text' });
+  for (const completing of [false, true]) {
+    assert.equal(auditMeasurementsChanged(audit, snapshot, completing), false, 'Inspection can contain further direct Text nodes outside the viewport');
+    assert.equal(auditMeasurementsChanged({ ...audit, runs: [] }, snapshot, completing), false, 'An entirely offscreen selection was intentionally omitted');
+    assert.equal(auditMeasurementsChanged(audit, fixtureSnapshot({ ...run, fontSizeCssPx: 11 }), completing), true, 'Changed inputs of a shared run remain contradictory');
+  }
+  const vanished = { ...snapshot, textRuns: [] };
+  const replaced = fixtureSnapshot({ ...run, id: 'replacement-text-node' });
+  for (const changed of [vanished, replaced]) {
+    assert.equal(auditMeasurementsChanged(audit, changed), true, 'A previously audited direct node missing from complete inspection is still a change');
+    assert.equal(auditMeasurementsChanged(audit, { ...changed, reasons: ['selection-text-limit'] }), false, 'Truncated inspection cannot prove a missing direct node');
+    assert.equal(auditMeasurementsChanged({ ...audit, status: 'running' }, changed), false, 'Running inventory cannot prove loss from incomplete evidence');
+  }
+  assert.equal(auditMeasurementsChanged({ ...audit, scope: 'page' }, snapshot), true, 'Whole-page inventories still detect additional direct Text nodes');
+});
+
+test('viewport fragments compare CSS inputs without equating their paint evidence to a whole Text node', () => {
+  const partialRun = { ...fixtureRun('#000', '#fff', 16), viewportPartial: true as const };
+  const audit = { ...fixtureAudit([partialRun]), scope: 'viewport' as const };
+  const fullRun = { ...partialRun, viewportPartial: undefined, effectiveBackground: null, reasons: ['layered-background'] };
+  const inspection = fixtureSnapshot(fullRun);
+  for (const completing of [false, true]) {
+    assert.equal(auditMeasurementsChanged(audit, inspection, completing), false, 'Additional offscreen fragments can change overlap evidence on unchanged DOM');
+    for (const change of [
+      { fontSizeCssPx: 11 }, { fontWeight: 700 }, { fontFamily: 'serif' }, { lineHeight: '30px' },
+      { foreground: fixtureRun('#333').foreground }, { background: fixtureRun('#000', '#eee').background },
+    ]) assert.equal(auditMeasurementsChanged(audit, fixtureSnapshot({ ...fullRun, ...change }), completing), true, 'Actual CSS inputs still contradict the scoped measurement');
+  }
+  assert.equal(auditMeasurementsChanged({ ...audit, runs: [{ ...partialRun, viewportPartial: undefined }] }, inspection), true, 'Fully included viewport runs retain ordinary evidence comparisons');
+  const vanished = { ...inspection, textRuns: [] };
+  assert.equal(auditMeasurementsChanged(audit, vanished), true, 'Partial viewport geometry does not excuse a missing audited Text identity');
+  assert.equal(auditMeasurementsChanged(audit, { ...vanished, reasons: ['selection-text-limit'] }), false, 'A truncated inspection cannot establish that identity loss');
 });
 
 test('completed follow-up inventories detect disappeared direct runs without guessing from truncated scans', () => {

@@ -1,5 +1,481 @@
 # Local validation record
 
+## Version 1.0.2 — release preparation, 2026-10-26
+
+Final review follow-up recorded on 2026-10-26. First-line/letter paint and font
+overrides cannot produce confirmed results from ordinary element styles.
+Background coverage is checked against the text geometry, including clipping,
+rounded corners and canvas propagation. Fully escaped painted boxes are skipped;
+unproven coverage remains unassessed with an explicit CSS-pair distinction.
+
+Audits, hover previews and explicit inspections yield within text collection and
+ancestor paint checks. Obsolete captures are cancelled, completed selections
+remain until replacement succeeds, and detached targets or changed pages cannot
+silently commit fresh results. Bounded live CSS-style caches are local to a job;
+derived style comparisons do not survive a synchronous work chunk. A handshake
+cannot overwrite a pending selection, picker intent or scan request.
+
+Analyses and comparison baselines remain only in memory. Session storage contains
+whitelisted document authorization metadata; legacy stored analyses are dropped.
+Reloads and background restarts discard results without starting another scan.
+Eviction releases the corresponding page-side results and references, with guards
+against delayed releases erasing newer work or stale handshakes restoring data.
+Failed scan starts settle their own controls even after a newer selection.
+
+Audit comparison preserves lower-bound prefixes and downward rounding. Font
+findings retain readability terminology. Keyboard focus survives audit-filter
+replacement. Page-value copy/export defaults to measured overview data, including
+placeholder styles, with an explicit raw-CSS alternative and frozen draft inputs.
+
+- All **391 unit/integration tests** and TypeScript checks pass. Extension lint
+  reports zero errors, warnings or notices.
+- Firefox **142.0** and **158.0.1** each pass **22 native paint groups**, including
+  ordinary underlined links, authored first-line decorations, font overrides,
+  out-of-box text, clipped previews and document canvas coverage.
+- Both Firefox versions also pass the **56 complete native extension groups**,
+  including two-window isolation, manual comparisons, metadata-only session
+  storage, clearing results on reload and no automatic scan after activation.
+- The **33 sidebar groups**, behavior checks, **12 workflow groups** and
+  **28 audit-tools groups** pass, including keyboard focus, explicit export
+  basis, frozen drafts, measured placeholders and legacy export compatibility.
+- Rendered UI contrast checks pass across **2,576 states**, **22,576 text** and
+  **17,268 non-text measurements**, with no enabled-text or control failures.
+- Ten isolated Firefox **158.0.1** responsiveness fixtures pass. With 300 nested
+  ancestors, the maximum observed timer gaps are **30 ms** for an audit,
+  **28 ms** for explicit inspection and **42 ms** for hover preview. The two
+  single-element stress captures still take approximately six seconds overall;
+  yielding keeps them interruptible. The 10,000-sibling stress case reaches a
+  **67 ms** gap. These are local samples, not timing guarantees.
+- After 4,000 mutations there are no further style, range or hit-test reads;
+  exactly one stale notification is sent. Disabled hover previews stay idle.
+
+The final local handoff records native Firefox results, independent source
+rebuilding and exact package hashes. Earlier checkpoints below describe their
+own historical behavior. Mozilla review, signing, publication and prolonged
+browsing in the owner's logged-in sessions remain outside the automated checks.
+
+## Earlier 1.0.2 checkpoint — audit tools
+
+Audit-tools follow-up recorded on 2026-10-21. Two compatible completed manual
+audits can be compared with the same contrast target. Removed or unassessable
+text never counts as repaired. One historical audit is retained within the
+existing analysis budget. The explicitly requested settings overview lists
+retained tabs and supports confirmed single-tab deletion across windows.
+Inventory notices report actual overflow, not merely reaching an exact limit.
+
+Rejected scan starts preserve results and history. Old audit notifications,
+late errors and unrelated storage errors cannot release a pending new start;
+clearing data retires pending starts. Large individual elements yield during
+both geometry collection and per-run measurement, and live child enumeration
+is bounded even when the page keeps appending nodes.
+
+- All **366 unit/integration tests** and TypeScript checks pass. Extension lint
+  reports zero errors, warnings or notices.
+- Firefox **142.0** and **158.0.1** each pass **55 native extension groups**,
+  including stable DOM identity across manual scans, comparison classifications,
+  rejected section starts, baseline rotation and deletion across two windows.
+- The existing **33 sidebar groups**, behavior checks and **12 workflow groups**
+  pass. The new **16 audit-tools result groups** cover English/German and both
+  themes, lazy comparison, paging focus, target reassessment, actual limit
+  notices, request races, confirmation cancellation and per-tab deletion.
+  Eight narrow German screenshots were generated; comparison and retained-tab
+  views were visually checked at 280 and 380 CSS px.
+- Rendered UI contrast checks pass across **2,576 states**, **22,592 text** and
+  **17,268 non-text measurements**, with no enabled-text or control failures.
+- Eight isolated Firefox responsiveness fixtures pass. A single element with
+  1,000 Text nodes completes in **124 ms**, with a longest observed timer gap
+  of **13 ms** (previous checkpoint: 62 ms). Yielding favors responsiveness over
+  shortest total scan time. The maximum gap across all fixtures is **30 ms**;
+  no sampled gap exceeds 50 ms. These are local samples, not timing guarantees.
+- After 4,000 mutations there are no further style, range or hit-test reads;
+  exactly one stale notification is sent. Disabled hover previews stay idle.
+
+Runtime/source package matching, independent offline source rebuilding and AMO
+field lengths are recorded with this local handoff. Mozilla review, signing,
+publication and prolonged browsing in the owner's logged-in sessions remain
+outside the automated checks.
+
+## Earlier 1.0.2 checkpoint — stability and export previews
+
+Stability follow-up recorded on 2026-10-21. Failed inspections now keep the
+previous snapshot paired with its original element. Picker callback failures
+cancel cleanly, release event guards, preserve confirmed selections and never
+retry automatically or let the failed click reach the page. Closing a sidebar
+during its readiness check stops late registration. Independent storage reads
+preserve successfully loaded settings or document authorization if the other
+storage area fails; subsequent user actions remain functional.
+
+Partly visible wide text now uses an onscreen overlap sample even when its full
+center lies outside the viewport. Visible covering layers remain unassessed,
+and removing them restores the measurement. Grouping distinguishes full and
+partial viewport coverage, with the qualification visible directly in cards.
+
+Large export previews are limited to 65,536 UTF-16 units and 256 decorative
+color swatches; full clipboard/download bytes are unchanged. Unchanged previews
+reuse their DOM and preserve focus and reading position. The 1,000-run regression
+previously created 1,163,705 preview characters and 6,006 descendant swatch nodes.
+
+- All **343 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- Firefox **142.0** and **158.0.1** each pass **53 native extension groups**.
+  The added real-window test verifies separate audits, shared appearance,
+  clearing analyses across two windows and closing a window during picking.
+  The viewport-edge fixture verifies the covered and uncovered wide-text cases.
+- The rendered DOM/sidebar suite passes **33 groups**; broader behavior checks
+  pass in English/German. The **12 workflow result groups** cover both languages
+  and themes, full large-report clipboard/download bytes, preview limits,
+  retained focus/scroll, source changes and distinct partial-coverage groups.
+  Narrow German typography/light and manual-contrast/dark screenshots were also
+  visually checked for readable controls and horizontal overflow.
+- UI contrast checks pass across **2,552 states**, **22,504 text measurements**
+  and **17,220 non-text measurements**, with no enabled-text or control failures.
+- Eight isolated Firefox 158 synthetic responsiveness cases pass. A scan of
+  10,000 sibling elements reaches the 1,000-run cap in **302 ms**, with a longest
+  observed timer gap of **23 ms**. The 300-ancestor case has a **28 ms** maximum
+  gap. A single element with 1,000 direct Text nodes takes **64 ms** and produces
+  a **62 ms** gap: work inside one element is a remaining optimization opportunity.
+  These are local samples, not timing guarantees or a complete browser profile.
+- After 4,000 mutations, no additional style, range or hit-test reads occur;
+  exactly one stale notification is emitted. Disabled hover previews perform
+  none of those reads. Automatic remeasurement remains disabled.
+
+The matching handoff records independent source rebuilding, exact runtime bytes,
+package hashes and AMO field limits. Real logged-in long-term browsing, native
+save dialogs, signed-package behavior and Mozilla review remain outside these
+automated checks. No publication is performed by this validation.
+
+## Earlier 1.0.2 checkpoint — scope and input edge cases
+
+Final edge-case review recorded on 2026-10-21. A selected-section audit no
+longer treats an inspection outside its root as disappeared text. Viewport
+audits distinguish intentionally omitted Text nodes and partial fragments from
+actual changes. Partly visible multiline Text nodes retain explicit fragment
+evidence in reports; a later full-element inspection explains the different
+measurement coverage without falsely invalidating unchanged results. Changes
+to the measured CSS/font inputs and missing previously measured direct text
+remain detectable.
+
+Excluded script/style payloads are rejected before their text is read. Display
+preferences no longer reassess and persist all retained analyses, and duplicate
+storage events do not repeat work. Changing the contrast target still updates
+ratings. Progressive font lists preserve keyboard focus, including the final
+page and disabled occurrence controls. Copied audit reports and page-token
+exports retain the measured scope independently of the next scan's draft choice.
+
+- All **338 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- Firefox **142.0** and **158.0.1** each pass **51 native extension groups**,
+  including a real multiline fixture with one visible and one offscreen fragment
+  in the same Text node. The audit remains current after full-element inspection,
+  and the sidebar preserves the original ratio and explains the scope difference.
+  The harness waits for changed result evidence when rescan totals are identical.
+- The rendered DOM/sidebar harness passes **33 groups** in Edge
+  **155.0.4283.62**. English/German workflows in light/dark and the broader
+  sidebar behavior checks pass, including focus after progressive loading,
+  copied scope, historical comparison and partial-viewport explanations.
+- UI contrast checks pass across **2,548 states**, **21,508 text measurements**
+  and **17,116 non-text measurements**, with no enabled-text or control failures.
+- Focused tests verify zero reads of excluded text payloads, no reassessment or
+  session writes for appearance-only preferences, and unchanged explicit-refresh
+  behavior. The synthetic timing samples below remain an earlier checkpoint;
+  they are not new performance measurements of this final build.
+
+The matching handoff records source-archive reproducibility, package hashes and
+AMO field lengths. These controlled fixtures do not recreate the user's complete
+logged-in browser session. Mozilla review, signing, publication and interactive
+download/multi-window checks remain outside this automated pass.
+
+## Earlier 1.0.2 checkpoint — performance and explicit scopes
+
+Performance and explicit-scope follow-up recorded on 2026-10-21. Audit work
+yields after a short elapsed-time budget as well as an element-count limit.
+Synchronous batches share bounded style/ownership caches, sibling labels avoid
+repeated full sibling copies, and deep ancestry remains conservatively bounded.
+Hover previews wait for a stable target; confirming a selection remains immediate.
+Central session analysis payloads are bounded and session writes are coalesced;
+this is not a limit on total browser heap usage. Font families/sizes are paged,
+and closed size groups do not build variant rows.
+
+Audits now support the whole main document, the viewport at scan start and a
+selected section. Results retain scope, duration, examined elements and limits.
+Missing values can be filtered by reason, and subsequent inspections can be
+compared with the historical audit for the exact same text area and document.
+Automatic remeasurement remains disabled and diagnostics remain opt-in.
+
+- All **327 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- Firefox **142.0** and **158.0.1** each pass **50 native extension groups**.
+  Scope checks cover draft changes without scanning, initial viewport inclusion,
+  section rescans after clearing selection, removed roots, historical comparison
+  and protected pages. The harness dispatches against the current audit control
+  after permission is established, avoiding detached controls during stale-state
+  rerenders; permission acquisition retains its trusted-click tests.
+- The rendered DOM/sidebar harness passes **33 groups** in Edge
+  **155.0.4283.62**. English/German workflow checks in light/dark cover reason
+  counts, preserved totals, exact-run comparisons, scope commands and progressive
+  family/size/variant rendering. The broader sidebar behavior checks also pass.
+- UI contrast checks pass across **2,548 states**, **21,497 text measurements**
+  (including 576 disabled controls reported separately) and **17,116 non-text
+  measurements**, with no enabled text or control failures.
+- A repeatable Firefox 158 synthetic content-script probe retains expected run
+  counts and cancellation/manual-refresh behavior. The 10,000-sibling fixture
+  reaches the 1,000-run cap in **300 ms**, compared with **4,158 ms** before the
+  changes. Its longest observed timer gap falls from **159 ms** to **24 ms**.
+  For 300 nested ancestors, the longest gap falls from **385 ms** to **24 ms**,
+  while total work remains approximately 1.4 seconds. These are local samples,
+  not guaranteed timings or a profile of the user's logged-in browser session.
+- After **4,000 mutations**, the passive-work probe records no additional style,
+  range or hit-test reads and exactly one stale-audit event. Disabled hover
+  previews perform none of those reads. Integration tests also cover hover
+  coalescing, elapsed-time yields, cancellation, cache eviction and write races.
+- With 1,000 synthetic font sizes/variants, the initial sidebar contains **12
+  size rows** and no closed variant rows, reducing total DOM elements from
+  **13,153 to 1,237**. Initial renders take 12–15 ms in the local probe, versus
+  97–109 ms previously; this comparison uses the same synthetic fixture.
+
+Source-archive reproducibility and package checks are recorded alongside the
+matching local handoff. Runtime verification is complete; Mozilla review,
+signing, publication and interactive download/multi-window checks remain outside
+this automated pass.
+
+## Earlier 1.0.2 checkpoint — YouTube controls
+
+YouTube control follow-up recorded on 2026-10-21. A displaced offscreen label
+can retain an explicitly enclosing opaque CSS background for an unverified
+color-pair comparison. This does not certify its page rendering. Unsupported
+surfaces, ambiguous controls and incomplete fragment coverage remain unresolved.
+
+The supplied collapsed-description structure was reproduced with a zero-width
+ellipsis owner, actual overflowing glyph ink, two masking gradients and a
+separate expansion control. Only the proven fully masked ellipsis is excluded;
+the visible control remains measured. Partial and unsupported masks retain a
+CSS-pair comparison with a mask explanation. Mask attempts and ancestor reads
+are bounded, and diagnostic reports distinguish zero-area boxes from offscreen
+boxes. Automatic measurement remains disabled.
+
+- All **312 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- Firefox **142.0** and **158.0.1** each pass **49 native extension groups**,
+  including mask removal, visible overflow from zero-width owners, CSS-only
+  offscreen results, manual refresh and disabled-by-default diagnostics.
+- The rendered DOM/sidebar harness passes **33 groups** in Edge
+  **155.0.4283.62**, including the manual-refresh mutation/scroll/resize checks.
+- Targeted baseline/candidate probes reproduce the offscreen reply-label
+  difference in Firefox and Edge; the masked-description fixture passes both
+  supported Firefox test versions.
+- Browser assertions accept English/German mask explanations and wait for
+  completed rescan counts instead of reading an earlier audit's values.
+
+These are controlled reproductions based on supplied markup and sanitized
+diagnostics, not a test of the user's logged-in YouTube session. Original
+diagnostics were stale; the offscreen reply-label cause is reproduced but its
+earlier live-page state cannot be reconstructed from the report alone.
+
+## Earlier 1.0.2 checkpoint — manual refresh
+
+Manual-refresh follow-up recorded on 2026-10-20. An element inspection no longer
+starts a complete follow-up audit, resize no longer remeasures a selection, and
+handshakes return cached measurements. DOM/scroll/viewport changes mark affected
+results stale once. Mutation and geometry listeners disconnect when no fresh
+measurements or unchanged running scan need them, and rearm on explicit work.
+Reference pruning no longer runs on every mutation; scan inventories are
+materialized for progress updates and completion instead of every batch.
+
+- All **301 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- The **34 content lifecycle tests** cover manual refresh/rescan, cancellation,
+  concurrent selection during a scan, stale result preservation, detached
+  selections, registry cleanup, reset, epoch changes and BFCache restoration.
+  Repeated sets of 200 mutations/scroll/resize events and handshakes produce no
+  further measurements, tree walks or repeated stale events after invalidation.
+- The rendered DOM/sidebar harness passes **33 groups** in Edge
+  **155.0.4283.62**, including 4,000 mutations plus scroll/resize, unchanged
+  timestamps/results/counts, one stale event per result and explicit refresh
+  with observation rearmed.
+- Firefox **142.0** and **158.0.1** each pass all **48 native extension groups**,
+  including dynamic page changes followed by explicit element/page refresh.
+- An isolated offline source rebuild reproduces all **15 runtime files**
+  byte-identically. Test browsers, drivers and fixture servers are closed.
+
+These controlled checks demonstrate bounded passive work, not a reproduction
+or timing profile of the user's complete browser slowdown. Explicit picker
+preview and an already requested page scan remain available. Earlier sidebar
+contrast evidence retains its checkpoint scope; no sidebar styling changed.
+
+## Earlier 1.0.2 checkpoint — optional diagnostics
+
+Diagnostic-controls follow-up recorded on 2026-10-20. The diagnostic copy
+button now defaults to hidden in existing and new installations. A saved
+Settings checkbox enables it for audit results, groups, matching elements and
+confirmed element inspection. Reset restores the disabled default.
+
+- All **301 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- Preference validation rejects non-boolean opt-ins. Disabled diagnostics do
+  not dispatch background-layer reads. Disabling or resetting the preference
+  invalidates pending replies, including changes from another sidebar.
+- Workflow checks pass in English/German and light/dark: default-hidden controls,
+  enabling and disabling, reopening settings, clipboard fallback cleanup,
+  disable/re-enable races and delayed clipboard failures.
+- UI contrast checks pass across **2,508 states**, **20,916 text measurements**
+  and **15,816 non-text measurements**, including enabled diagnostic controls
+  and the new checkbox in both states. German settings screenshots at 280 CSS
+  pixels were reviewed in light/dark with no horizontal overflow.
+- Firefox **142.0** and **158.0.1** each pass all **47 native extension groups**,
+  including the disabled default, persisted opt-in, explicit diagnostic copy
+  and persisted disabling. Test browsers, drivers and local servers are closed.
+- An isolated offline source rebuild reproduces all **15 runtime files**
+  byte-identically, including the final reset wording correction.
+
+The final wording correction removes the obsolete fixed preference count from
+the reset description and confirmation in both languages; control behavior and
+styling are unchanged by that correction.
+
+This remains an unpublished local 1.0.2 test build. Prior validation checkpoints
+below retain their original scope.
+
+## Earlier 1.0.2 checkpoint — animated counters
+
+Animated-counter follow-up recorded on 2026-10-20. Three supplied YouTube
+diagnostics and the user's confirmation identify clipped digits in a view-count
+animation. Visibility checks now cover supported, single-fragment preformatted
+digits and their glyph bounds. They do not assign contrast to hidden text or
+relax checks for uncertain backgrounds.
+
+- All **299 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- A generic animated-counter fixture reproduces the original behavior in
+  Firefox **142.0**, Firefox **158.0.1** and Edge **155.0.4283.62**. Each browser
+  passes four focused groups: the original 34 findings become 18 after excluding
+  16 fully clipped digits, including immediately adjacent animation rows.
+- Visible and revealed digits retain matching colors, contrast and AA/AAA
+  results in audit and inspection. Partially visible glyphs, escaping positioned
+  content, ordinary offscreen text and unsupported formatting remain eligible.
+  Shadow/filter uncertainty is preserved, real overlays remain unassessed,
+  moving the counter updates visibility and expanding it restores all 34 nodes.
+- Firefox **142.0** and **158.0.1** each pass all **47 existing native extension
+  regression groups** against the final runtime build.
+- An isolated offline source rebuild reproduces all **15 runtime files**
+  byte-identically. Test browsers, drivers and local servers are closed.
+
+These checks use controlled fixtures derived from sanitized diagnostics, not
+the user's logged-in YouTube session. Earlier sidebar contrast evidence below
+belongs to its recorded checkpoints; this change does not alter sidebar styles.
+Native save dialogs, interactive multi-window cases and signed-package checks
+remain manual. No commit, upload or publication is asserted.
+
+## Earlier 1.0.2 checkpoint — typography sorting
+
+Typography follow-up recorded on 2026-10-20. Sizes and weight/line-height
+variants now default to occurrence frequency, with selectable ascending or
+descending size order. Unknown sizes remain last; font-family order and saved
+measurements are unchanged. Occurrence buttons use compact widths and the
+same accent treatment as Show on page.
+
+- All **295 unit/integration tests**, TypeScript checking, build and extension
+  lint pass; lint reports zero errors, warnings or notices.
+- The existing sidebar-behavior suite and updated workflow suite pass in
+  English/German and light/dark. Focused checks cover frequency ties, numeric
+  size ordering, unknown values, variants, retained sort order after inspection,
+  unchanged measurement data and compact buttons at 280/380 CSS pixels.
+- Representative narrow-layout screenshots were reviewed in both themes.
+- UI contrast checks pass across **2,312 states**, **19,504 text measurements**
+  and **15,032 non-text measurements**. The occurrence controls reach at least
+  **5.44:1 in light mode** and **6.14:1 in dark mode**, including hover/focus.
+- An isolated offline source rebuild reproduces all **15 runtime files**
+  byte-identically. Test browser processes and local servers are closed.
+
+This follow-up changes the sidebar presentation only. Earlier native Firefox
+checks below describe the preceding workflow checkpoint, not a repeated native
+run for this presentation change. No commit, upload or publication is asserted.
+
+## Earlier 1.0.2 checkpoint — inventory workflows
+
+Recorded on 2026-10-20 for unpublished working version **1.0.2**. This update adds
+matching-element navigation from colors and typography, optional audit grouping,
+palette transfers to the manual contrast checker, font-weight/line-height
+variants and explicit diagnostic JSON copies. No commit, upload, signing or
+publication is asserted.
+
+Validation completed:
+
+- All **295 unit/integration tests**, TypeScript checking and build pass.
+- Extension lint reports zero errors, warnings or notices.
+- Content/DOM and existing sidebar-behavior harnesses pass. A new workflow
+  harness covers English/German, light/dark and 280/380-pixel layouts: exact
+  color/font/size/variant associations, Show/Inspect/Return, selection retention,
+  stale data, navigation and automatic rescans that reuse an audit ID.
+- Optional groups preserve measured, CSS-only and unresolved findings separately,
+  their original totals and access to individual members, including pagination.
+  Manual transfers preserve fractional and alpha values; transparent backgrounds
+  require an explicitly chosen opaque underlay before displaying a ratio.
+- Diagnostic tests verify document/source/run identity, bounded style capture,
+  sanitized output, requesting-port isolation and clipboard fallback. Late
+  replies and errors cannot replace newer UI or clipboard state after rescan,
+  selection changes, navigation, clearing, reconnecting or changing views.
+- UI contrast checks cover **2,112 states**, **18,395 enabled text measurements**
+  and **13,560 non-text measurements**, with zero failures. Another 512 disabled
+  text measurements are reported separately. Decorative swatches and native
+  widget interiors are excluded from these assertions.
+- Firefox **142.0** and **158.0.1** each pass all **47 native extension groups**,
+  including real inventory navigation and diagnostic capture. Initial runs
+  exposed asynchronous test waits that accepted previous audit counts; the
+  waits now require the expected refreshed result, without relaxing assertions.
+- Representative narrow-layout screenshots were reviewed. The final copy edit
+  removes an obsolete opaque-color restriction from the manual checker hint;
+  it does not change controls or measurement behavior.
+- An isolated offline source rebuild reproduces all **15 runtime files**
+  byte-identically. Test browsers and local servers are closed.
+
+These are controlled-fixture checks, not a claim of correct assessment of every
+live website. Inventory roles remain heuristic; font families describe CSS
+fallback lists rather than the actual font face used for every glyph. Diagnostics
+combine the original measurement with separately timestamped current styles and
+do not reclassify uncertain contrast. Native save dialogs and Mozilla-signed
+package checks remain manual.
+
+## Earlier 1.0.2 checkpoint — palette and font inventory
+
+Recorded on 2026-10-20 for unpublished working version **1.0.2**. No commit,
+upload, signing or publication is asserted by this record.
+
+Page palettes now group measured colors by use, with optional frequency and hue
+sorting. CSS font-family stacks are ordered by measured usage and list each
+observed CSS font size separately. Counts describe distinct measured text
+elements, not painted area or the actual rendered font face. Exact RGBA aliases
+merge without reducing measurement precision; transparent and unresolved colors
+remain separate from visible colors. Legacy sessions retain their original
+values and request a fresh audit for missing usage metadata. Raw token exports
+remain compatible with the previous inventory.
+
+Validation completed:
+
+- All **272 unit/integration tests**, TypeScript checking and build pass.
+- Extension lint reports zero errors, warnings or notices.
+- The complete sidebar/DOM, sidebar-behavior and UI-contrast harnesses pass,
+  including English/German, light/dark and 280-pixel layouts. New regressions
+  cover unique-element counting, multiple text fragments, aliases, inherited
+  backgrounds, interactive roles, numeric size lists, legacy sessions, sorted
+  pagination, copies, rescan replacement and unchanged exports.
+- UI contrast checks cover **1,504 states**, **15,574 enabled text measurements**
+  and **11,152 non-text measurements**, with no failures. Decorative swatches
+  and native widget interiors are excluded from these contrast assertions.
+- Firefox **142.0** and **158.0** each pass all **45 native extension groups**.
+  The first Firefox 158 process exited during driver startup before tests;
+  a fresh isolated run completed successfully.
+- Representative palette and font-list screenshots were reviewed at narrow
+  widths in both themes; controls and size rows remain readable and aligned.
+- An isolated offline source rebuild reproduces all **15 runtime files**
+  byte-identically. Test browser sessions and local servers are closed.
+
+These checks use controlled fixtures; usage roles remain a heuristic, and the
+existing bounded audit determines which page elements contribute. Native save
+dialogs and a Mozilla-signed package remain manual checks. Earlier validation
+below documents version 1.0.1 and is not a claim that all earlier specialist
+probes were repeated for this change.
+
+## Previous validation — version 1.0.1
+
 Recorded on 2026-10-20 for the prepared initial release **1.0.1** (unpublished).
 The source is the working tree, with no commit provenance asserted. Results apply
 to this local implementation; subsequent runtime changes require relevant checks

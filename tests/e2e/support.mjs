@@ -33,7 +33,7 @@ export async function serve() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   return { url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(resolve => server.close(resolve)) };
 }
-export const defaults = { schemaVersion: 1, appearance: 'system', colorFormat: 'hex', contrastTarget: 'AA', livePreview: true, contextMenuEnabled: true };
+export const defaults = { schemaVersion: 1, appearance: 'system', colorFormat: 'hex', contrastTarget: 'AA', livePreview: true, contextMenuEnabled: true, showDiagnostics: false };
 export function message(catalog, key, substitutions = []) {
   const entry = catalog[key]; if (!entry) return '';
   const values = Array.isArray(substitutions) ? substitutions : [substitutions];

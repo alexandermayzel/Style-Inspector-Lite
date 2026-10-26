@@ -1,3 +1,5 @@
+import { transparentMask } from './mask-geometry';
+
 interface Rect { left: number; top: number; width: number; height: number }
 interface Clip extends Rect { x: boolean; y: boolean }
 const htmlNamespace = 'http://www.w3.org/1999/xhtml';
@@ -39,7 +41,7 @@ function canvasTextRendering(raw: string): 'auto' | 'optimizeLegibility' | null 
 
 function normalText(style: CSSStyleDeclaration): boolean {
   return style.direction === 'ltr' && style.writingMode === 'horizontal-tb'
-    && ['normal', 'isolate'].includes(style.unicodeBidi) && ['normal', 'nowrap', 'pre-line'].includes(style.whiteSpace)
+    && ['normal', 'isolate'].includes(style.unicodeBidi) && ['normal', 'nowrap', 'pre-line', 'pre', 'pre-wrap'].includes(style.whiteSpace)
     && style.textTransform === 'none' && ['normal', 'italic'].includes(style.fontStyle) && ['normal', '100%'].includes(style.fontStretch)
     && [style.fontVariantCaps, style.fontVariantLigatures, style.fontVariantNumeric, style.fontVariantAlternates,
       style.fontVariantEastAsian, style.fontVariantPosition, style.fontVariationSettings].every(value => value === 'normal')
@@ -122,12 +124,13 @@ export function unclippedTextRects(element: Element, text: Text, rects: readonly
   const document = element.ownerDocument, view = document.defaultView;
   if (!view || document.fonts?.status !== 'loaded') return unchanged();
   const style = view.getComputedStyle(element);
-  // pre-line preserves forced line breaks. Only its single-fragment subset
-  // without such characters can use the existing collapsed-space ink proof.
-  if (!normalText(style) || style.whiteSpace === 'pre-line' && rects.length !== 1) return unchanged();
+  // Preserved whitespace needs a bounded single-fragment subset. The raw-text
+  // guards below keep breaks/tabs and pre spacing outside this ink proof.
+  if (!normalText(style) || ['pre-line', 'pre', 'pre-wrap'].includes(style.whiteSpace) && rects.length !== 1) return unchanged();
   const clips: Clip[] = [];
+  const masks: ((rect: Rect) => boolean)[] = [];
   const ancestors: { element: Element; style: CSSStyleDeclaration }[] = [];
-  let needsContainingBlock = false, escaped = false, depth = 0;
+  let needsContainingBlock = false, escaped = false, depth = 0, attemptedMasks = 0;
   for (let current: Element | null = element; current; current = current.parentElement) {
     if (++depth > 300 || current.namespaceURI !== htmlNamespace) return unchanged();
     const currentStyle = view.getComputedStyle(current);
@@ -143,6 +146,11 @@ export function unclippedTextRects(element: Element, text: Text, rects: readonly
     // Its border/client dimensions cannot prove clipping for every descendant.
     if (!escaped && !needsContainingBlock && current !== document.documentElement && current !== document.body && current.tagName !== 'FIELDSET'
       && boxDisplays.has(currentStyle.display)) {
+      if (currentStyle.maskImage && !/^none(?:\s*,\s*none)*$/.test(currentStyle.maskImage.trim())) {
+        if (++attemptedMasks > 8) return unchanged();
+        const masked = transparentMask(current, currentStyle);
+        if (masked) masks.push(masked);
+      }
       const x = ['hidden', 'auto', 'scroll'].includes(currentStyle.overflowX);
       const y = ['hidden', 'auto', 'scroll'].includes(currentStyle.overflowY);
       if (x || y) {
@@ -165,11 +173,20 @@ export function unclippedTextRects(element: Element, text: Text, rects: readonly
       else if (!['static', 'relative'].includes(currentStyle.position)) escaped = true;
     }
   }
-  if (!clips.length) return unchanged();
+  if (!clips.length && !masks.length) return unchanged();
+  // The preserved pre-wrap subset is introduced only for mask proofs; keep
+  // its existing overflow-only behavior until that separate layout is modeled.
+  if (style.whiteSpace === 'pre-wrap' && !masks.length) return unchanged();
   // Measure only candidates whose layout box is already wholly outside a clip.
   const outside = (rect: Rect) => clips.some(clip => clip.x && (rect.left >= clip.left + clip.width || rect.left + rect.width <= clip.left)
     || clip.y && (rect.top >= clip.top + clip.height || rect.top + rect.height <= clip.top));
-  if (!rects.some(outside)) return unchanged();
+  // A font box can straddle a mask edge while all glyph ink is hidden. The
+  // center is only a cheap candidate gate; removal needs the full ink proof.
+  const mayBeMasked = (rect: Rect) => masks.some(mask => mask({ left: rect.left + rect.width / 2,
+    top: rect.top + rect.height / 2, width: 0.001, height: 0.001 }));
+  if (!rects.some(rect => outside(rect) || mayBeMasked(rect))) return unchanged();
+  if (masks.length && ancestors.some(({ element: owner }) => owner.assignedSlot || owner.shadowRoot
+    || (owner as Element & { openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot)) return unchanged();
   // The expensive effect/pseudo/font proof runs only for a candidate that a
   // scrollport could wholly hide. Ordinary visible/offscreen text stops above.
   let decorationLeft = Infinity, decorationRight = -Infinity;
@@ -208,6 +225,10 @@ export function unclippedTextRects(element: Element, text: Text, rects: readonly
   // Even a trailing break may leave only one positive Range rectangle. Never
   // turn preserved breaks or a form-feed control into an ordinary Canvas space.
   if (style.whiteSpace === 'pre-line' && /[\r\n\f]/.test(raw)) return unchanged();
+  // Rolling counters use pre for each digit, even when most digits sit outside
+  // their scrollport. Without collapsible whitespace, their metrics can use the
+  // same exact proof. Never normalize or trim preserved pre spaces to fit it.
+  if (['pre', 'pre-wrap'].includes(style.whiteSpace) && /[\t\r\n\f ]/.test(raw)) return unchanged();
   if (!/^[\x20-\x7e\u00a0-\u024f\u0400-\u052f\u2010-\u2027\u20ac\t\r\n\f]+$/.test(raw) || /\p{Mark}/u.test(raw)
     || !separatedBoundary(text, raw, 'previousSibling') || !separatedBoundary(text, raw, 'nextSibling')) return unchanged();
   const content = raw.replace(/[\t\r\n\f ]+/g, ' ');
@@ -255,12 +276,13 @@ export function unclippedTextRects(element: Element, text: Text, rects: readonly
   const lines = wrapped ? wrappedLines(text, raw, rects) : [raw];
   if (!lines) return unchanged();
   return rects.filter((rect, index) => {
-    if (!outside(rect)) return true;
+    if (!outside(rect) && !mayBeMasked(rect)) return true;
     const line = lines[index]!.replace(/[\t\r\n\f ]+/g, ' ');
     // CSS collapses spaces at line and text-node boundaries. Preserve every
     // width-matching interpretation and never trim nonbreaking spaces.
     const candidates = [...new Set([line, line.replace(/^ +/, ''), line.replace(/ +$/, ''), line.replace(/^ +| +$/g, '')])];
     let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity, matched = false;
+    let inkLeft = Infinity, inkRight = -Infinity, inkTop = Infinity, inkBottom = -Infinity;
     for (const candidate of candidates) {
       const metrics = context.measureText(candidate);
       const values = [metrics.width, metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent,
@@ -272,18 +294,26 @@ export function unclippedTextRects(element: Element, text: Text, rects: readonly
       matched = true;
       const guard = Math.max(1, 1 / view.devicePixelRatio) + Math.max(widthError, heightError);
       const baseline = rect.top + metrics.fontBoundingBoxAscent;
+      inkLeft = Math.min(inkLeft, rect.left - metrics.actualBoundingBoxLeft - guard);
+      inkRight = Math.max(inkRight, rect.left + metrics.actualBoundingBoxRight + guard);
+      inkTop = Math.min(inkTop, baseline - metrics.actualBoundingBoxAscent - guard);
+      inkBottom = Math.max(inkBottom, baseline + metrics.actualBoundingBoxDescent + guard);
       // Every matching whitespace interpretation must be hidden. Taking the union
       // preserves a glyph whose overhang could still reach inside the scrollport.
       left = Math.min(left, Math.min(rect.left, rect.left - metrics.actualBoundingBoxLeft) - guard);
       right = Math.max(right, Math.max(rect.left + rect.width, rect.left + metrics.actualBoundingBoxRight) + guard);
       left = Math.min(left, decorationLeft - guard);
       right = Math.max(right, decorationRight + guard);
-      // Verified wrapped-line ink can start below its font box. Keeping the box
-      // itself would mistake a fully hidden next line for a visible fragment.
-      top = Math.min(top, (wrapped ? baseline - metrics.actualBoundingBoxAscent : Math.min(rect.top, baseline - metrics.actualBoundingBoxAscent)) - guard);
-      bottom = Math.max(bottom, (wrapped ? baseline + metrics.actualBoundingBoxDescent : Math.max(rect.top + rect.height, baseline + metrics.actualBoundingBoxDescent)) + guard);
+      // Wrapped lines and the whitespace-free pre subset have verified ink
+      // positions. Empty font-box padding must not make an adjacent hidden
+      // counter row look visible; real overhang and the rounding guard remain.
+      const exactVerticalInk = wrapped || ['pre', 'pre-wrap'].includes(style.whiteSpace);
+      top = Math.min(top, (exactVerticalInk ? baseline - metrics.actualBoundingBoxAscent : Math.min(rect.top, baseline - metrics.actualBoundingBoxAscent)) - guard);
+      bottom = Math.max(bottom, (exactVerticalInk ? baseline + metrics.actualBoundingBoxDescent : Math.max(rect.top + rect.height, baseline + metrics.actualBoundingBoxDescent)) + guard);
     }
     if (!matched) return true;
+    if (decorationLeft === Infinity && masks.some(mask => mask({ left: inkLeft, top: inkTop,
+      width: inkRight - inkLeft, height: inkBottom - inkTop }))) return false;
     return !clips.some(clip => clip.x && (left >= clip.left + clip.width || right <= clip.left)
       || decorationLeft === Infinity && clip.y && (top >= clip.top + clip.height || bottom <= clip.top));
   });

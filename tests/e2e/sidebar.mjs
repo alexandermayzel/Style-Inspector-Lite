@@ -84,8 +84,14 @@ try {
   assert.equal(fresh.selected, null); assert.equal(fresh.picker, false); assert.equal(fresh.audit.stale, false);
   const changedRun = fresh.audit.runs.find(run => run.selector === sampleRun.selector);
   assert.equal(changedRun.contrast.status, 'pass'); assert.equal(changedRun.fontSize.status, 'pass');
-  assert.notEqual(changedRun.elementRef, sampleRun.elementRef, 'Rescan retires old element references');
-  assert.equal((await fixture.evaluate(referenceId => window.__command('show-node', { referenceId }), sampleRun.elementRef)).error, 'element-removed');
+  assert.equal(changedRun.elementRef, sampleRun.elementRef, 'A manual rescan preserves the same live DOM element identity');
+  assert.equal(changedRun.id, sampleRun.id, 'The actual surviving Text node keeps its comparison identity');
+  assert.equal((await fixture.evaluate(referenceId => window.__command('select-node', { referenceId }), sampleRun.elementRef)).ok, true);
+  const reselectedSample = (await fixture.evaluate(() => window.__command('hello'))).selected;
+  assert.equal(reselectedSample.elementRef, changedRun.elementRef);
+  assert.equal(reselectedSample.textExcerpt.value, await fixture.locator('#sample').textContent(), 'The retained reference selects the current DOM element');
+  assert.equal(reselectedSample.textRuns[0].fontSizeCssPx, 16);
+  assert.equal(reselectedSample.textRuns[0].contrast.status, 'pass', 'Reselection reads the updated paint instead of a former snapshot');
   findings.push({ check: 'repeated show/inspect, overlay immunity, real mutation stale, fresh rescan resets selection and remeasures changed styles', passed: true });
   // A real browser event chain must be suppressed during picking and work again afterward.
   await fixture.evaluate(() => window.__command('start-picker'));
@@ -129,6 +135,93 @@ try {
   await fixture.keyboard.press('Escape');
   assert.equal(await fixture.locator('[data-style-inspector-overlay]').count(), 0);
   findings.push({ check: 'labeled page highlight, visible duration, unchanged target CSS, nested scroll/resize tracking and Escape dismissal', passed: true });
+  const inventoryPage = await browser.newPage({ viewport: { width: 1000, height: 1100 } });
+  await inventoryPage.goto(`${host.url}/tests/fixtures/style-inventory.html`);
+  await inventoryPage.evaluate(({ defaults, en }) => {
+    window.__events = []; window.__handlers = [];
+    window.browser = { runtime: { id: 'sil-test', onMessage: { addListener(fn) { window.__handlers.push(fn); } }, sendMessage: async event => { window.__events.push(structuredClone(event)); } }, i18n: { getUILanguage: () => 'en', getMessage: key => en[key]?.message ?? '' } };
+    window.__command = async (type, detail = {}) => {
+      const message = { channel: 'sil-content', type, requestId: `inventory-${type}`, epoch: 0, windowId: 1, tabId: 1, settings: defaults, ...detail };
+      for (const fn of window.__handlers) { const result = fn(message, { id: 'sil-test' }); if (result !== undefined) return await result; }
+    };
+  }, { defaults, en });
+  await inventoryPage.addScriptTag({ url: `${host.url}/dist/content.js` });
+  const scanInventory = async requestId => {
+    await inventoryPage.evaluate(requestId => window.__command('start-audit', { requestId }), requestId);
+    await inventoryPage.waitForFunction(requestId => window.__events.some(event => event.requestId === requestId && event.audit?.status === 'complete'), requestId);
+    return (await inventoryPage.evaluate(() => window.__command('hello'))).audit;
+  };
+  const initialInventory = await scanInventory('inventory-first');
+  const inventoryIds = ['body-a', 'split', 'caption-a', 'caption-b', 'heading-small', 'heading-large', 'link', 'button', 'nested-button', 'glyph', 'alpha'];
+  const inventorySelections = await inventoryPage.evaluate(async ids => {
+    const result = {};
+    for (const id of ids) {
+      window.__styleInspectorContext = { requestId: 'inventory-capture-context', element: document.getElementById(id) };
+      await window.__command('capture-context');
+      result[id] = window.__events.filter(event => event.type === 'selected').at(-1).snapshot;
+    }
+    return result;
+  }, inventoryIds);
+  assert.equal(new Set(initialInventory.runs.map(run => run.elementRef)).size, 11);
+  assert.equal(initialInventory.runs.length, 12, 'Two direct text fragments in one element remain two measured runs');
+  assert.equal(inventorySelections.split.textRuns.length, 2);
+  for (const selection of Object.values(inventorySelections)) for (const run of selection.textRuns) {
+    const audited = initialInventory.runs.find(item => item.id === run.id);
+    assert.ok(audited, 'An independently inspected fixture element was actually collected');
+    assert.deepEqual(audited.foreground, run.foreground);
+    assert.deepEqual(audited.effectiveBackground, run.effectiveBackground);
+  }
+  const byRGBA = (audit, r, g, b, a = 1) => audit.paletteUsage.find(entry => entry.color.rgba?.r === r && entry.color.rgba?.g === g && entry.color.rgba?.b === b && entry.color.rgba?.a === a);
+  assert.equal(byRGBA(initialInventory, 102, 102, 102).count, 2, 'Repeated caption elements each count once');
+  assert.deepEqual(byRGBA(initialInventory, 102, 102, 102).roles, { text: 2 });
+  assert.equal(byRGBA(initialInventory, 153, 0, 0).count, 1, 'Inventory includes actual painted glyph color');
+  assert.equal(byRGBA(initialInventory, 0, 0, 0).count, 3, 'Two text fragments do not inflate black usage; the separate CSS fallback is retained once');
+  assert.deepEqual(byRGBA(initialInventory, 0, 102, 204).roles, { accent: 2, background: 1 }, 'Links and nested button labels retain meaningful roles without duplicating matching backgrounds');
+  assert.equal(byRGBA(initialInventory, 240, 240, 240).roles.background, 3, 'Ancestor surfaces are counted for the three measured text elements');
+  assert.ok(byRGBA(initialInventory, 255, 255, 255).roles.background > 0, 'The resolved browser canvas is represented as a background');
+  assert.ok(initialInventory.palette.some(color => color.rgba?.a === 0), 'Legacy raw palette retains its transparent CSS values');
+  assert.ok(!initialInventory.palette.some(color => color.rgba?.r === 153 && color.rgba?.g === 0 && color.rgba?.b === 0), 'Additional measured glyph colors do not rewrite legacy token exports');
+  const arial = initialInventory.fontUsage.find(font => font.family === 'Arial, sans-serif');
+  const georgia = initialInventory.fontUsage.find(font => font.family === 'Georgia, serif');
+  assert.equal(arial.count, 9); assert.equal(georgia.count, 2);
+  const sizeCounts = font => [...font.sizes].sort((a, b) => a.sizeCssPx - b.sizeCssPx).map(({ sizeCssPx, count }) => ({ sizeCssPx, count }));
+  assert.deepEqual(sizeCounts(arial), [{ sizeCssPx: 12, count: 2 }, { sizeCssPx: 14, count: 1 }, { sizeCssPx: 16, count: 6 }]);
+  assert.deepEqual(sizeCounts(georgia), [{ sizeCssPx: 24, count: 1 }, { sizeCssPx: 32, count: 1 }]);
+  assert.deepEqual([...arial.variants].sort((a, b) => a.sizeCssPx - b.sizeCssPx).map(({ sizeCssPx, fontWeight, lineHeight, count }) => ({ sizeCssPx, fontWeight, lineHeight, count })), [
+    { sizeCssPx: 12, fontWeight: 400, lineHeight: '18px', count: 2 },
+    { sizeCssPx: 14, fontWeight: 400, lineHeight: '21px', count: 1 },
+    { sizeCssPx: 16, fontWeight: 400, lineHeight: '24px', count: 6 },
+  ]);
+  const byReference = ref => initialInventory.runs.filter(run => run.elementRef === ref);
+  for (const entry of initialInventory.paletteUsage) {
+    assert.equal(new Set(entry.elementRefs).size, entry.count, 'Color associations count each measured element once');
+    assert.ok(entry.elementRefs.every(ref => byReference(ref).length > 0), 'Color references belong to this audit');
+  }
+  for (const font of initialInventory.fontUsage) {
+    assert.equal(new Set(font.elementRefs).size, font.count);
+    assert.ok(font.elementRefs.every(ref => byReference(ref).some(run => run.fontFamily === font.family)));
+    for (const variant of font.variants) {
+      assert.equal(new Set(variant.elementRefs).size, variant.count);
+      assert.ok(variant.elementRefs.every(ref => byReference(ref).some(run => run.fontFamily === font.family && run.fontSizeCssPx === variant.sizeCssPx && run.fontWeight === variant.fontWeight && run.lineHeight === variant.lineHeight)), 'Variant associations preserve the measured family, size, weight and line height together');
+    }
+  }
+  assert.equal(initialInventory.fontUsage.reduce((sum, font) => sum + font.count, 0), 11, 'Font frequency counts elements rather than text fragments');
+  await inventoryPage.evaluate(() => {
+    document.getElementById('caption-b').remove();
+    document.getElementById('split').style.fontSize = '18px';
+  });
+  const rescannedInventory = await scanInventory('inventory-rescan');
+  assert.equal(byRGBA(rescannedInventory, 102, 102, 102).count, 1);
+  assert.equal(rescannedInventory.fontUsage.find(font => font.family === 'Arial, sans-serif').count, 8);
+  assert.equal(rescannedInventory.fontUsage.find(font => font.family === 'Arial, sans-serif').sizes.some(size => size.sizeCssPx === 14), false);
+  assert.equal(rescannedInventory.fontUsage.find(font => font.family === 'Arial, sans-serif').sizes.find(size => size.sizeCssPx === 18).count, 1);
+  const resetInventory = await inventoryPage.evaluate(() => window.__events.find(event => event.requestId === 'inventory-rescan' && event.audit?.status === 'running').audit);
+  assert.deepEqual(resetInventory.paletteUsage, []); assert.deepEqual(resetInventory.fontUsage, []);
+  assert.equal(initialInventory.fontUsage.find(font => font.family === 'Arial, sans-serif').count, 9, 'Published metadata snapshots stay detached from later scans');
+  await assertMeasurementEventsTextFree(inventoryPage, /Inventory plain text|First fragment|Inventory nested label/);
+  assert.ok(rescannedInventory.palette.length <= 128 && rescannedInventory.paletteUsage.length <= 128 && rescannedInventory.fonts.length <= 64 && rescannedInventory.fontUsage.length <= 64);
+  findings.push({ check: 'style inventories count unique measured text elements, preserve actual glyph and inherited/canvas backgrounds, classify nested interactive controls, list font sizes and fully replace counts on rescan without changing raw tokens or leaking text', passed: true });
+  await inventoryPage.close();
   const freshness = await browser.newPage({ viewport: { width: 1000, height: 900 } });
   await freshness.goto(`${host.url}/tests/fixtures/audit-freshness.html`);
   await freshness.evaluate(({ defaults, en }) => {
@@ -160,19 +253,11 @@ try {
   }, { referenceId, target, defaults });
   const freshnessEvents = () => freshness.evaluate(() => window.__events);
   const freshnessStarts = () => freshness.evaluate(() => window.__events.filter(event => event.audit?.status === 'running' && event.audit.scanned === 0).length);
-  const waitFreshnessAudit = async (offset, previous, status = 'complete') => {
-    await freshness.waitForFunction(({ offset, id, measuredAt, status }) => window.__events.slice(offset).some(event => event.requestId === id && event.audit?.status === status && event.audit.measuredAt !== measuredAt), { offset, id: previous.id, measuredAt: previous.measuredAt, status });
-    const events = (await freshnessEvents()).slice(offset);
-    const completed = events.findLast(event => event.requestId === previous.id && event.audit?.status === status).audit;
-    assert.equal(completed.id, previous.id, 'An automatic refresh preserves the coordinator audit request');
-    assert.ok(Date.parse(completed.measuredAt) > Date.parse(previous.measuredAt), 'A refresh has a new measurement time');
-    const starts = events.filter(event => event.audit?.status === 'running' && event.audit.scanned === 0);
-    assert.equal(starts.length, 1, 'One contradictory explicit inspection starts exactly one full audit');
-    assert.deepEqual(starts[0].audit.runs, [], 'The new audit starts without historical rows');
-    assert.deepEqual(starts[0].audit.palette, [], 'The palette is rebuilt with the audit');
-    assert.deepEqual(starts[0].audit.fonts, [], 'The font inventory is rebuilt with the audit');
-    assert.equal(starts[0].audit.counts.contrast.assessed, 0, 'Historical totals are never mixed into a new scan');
-    return completed;
+  const assertHistoricalAudit = async (previous, starts, stale = true) => {
+    const state = await freshness.evaluate(() => window.__command('hello'));
+    assert.deepEqual(state.audit, { ...previous, stale }, 'Rows, counts, fonts, palette and timestamp remain the original snapshot');
+    assert.equal(await freshnessStarts(), starts, 'No automatic full audit starts');
+    return state;
   };
   assert.equal((await inspectFreshness(coveredRun.elementRef)).textRuns[0].contrast.status, 'manual');
   assert.equal((await freshness.evaluate(() => window.__command('hello'))).audit.stale, false, 'Unchanged uncertain inspection keeps the audit fresh');
@@ -206,99 +291,89 @@ try {
     document.styleSheets[0].cssRules[2].style.fontFamily = 'Georgia, serif';
     document.getElementById('dynamic-rules').sheet.cssRules[1].style.color = '#00FF00';
   });
-  const refreshOffset = (await freshnessEvents()).length;
   const freshCovered = (await inspectFreshness(coveredRun.elementRef)).textRuns.find(run => run.id === coveredRun.id);
   assert.equal(freshCovered.contrast.status, 'pass');
   assert.ok(Math.abs(freshCovered.contrast.ratio - 13.569124702898852) < 1e-12);
-  const refreshedAudit = await waitFreshnessAudit(refreshOffset, freshnessAudit);
-  assert.equal(refreshedAudit.stale, false);
-  assert.deepEqual(refreshedAudit.counts.contrast, { pass: 3, fail: 0, manual: 0, notApplicable: 0, assessed: 3 });
-  assert.deepEqual(refreshedAudit.fonts, ['Georgia, serif']);
-  assert.ok(!freshnessAudit.fonts.includes(refreshedAudit.fonts[0]), 'The new font inventory replaces the old one');
-  assert.ok(refreshedAudit.palette.some(color => color.rgba?.r === 0 && color.rgba.g === 255 && color.rgba.b === 0));
-  assert.ok(!freshnessAudit.palette.some(color => color.rgba?.r === 0 && color.rgba.g === 255 && color.rgba.b === 0));
-  assert.deepEqual(refreshedAudit.runs.find(run => run.id === coveredRun.id).contrast, freshCovered.contrast);
-  assert.ok(refreshedAudit.runs.some(run => run.elementRef === stableRun.elementRef), 'The automatic scan retains existing registry references');
-  const refreshedState = await freshness.evaluate(() => window.__command('hello'));
-  assert.equal(refreshedState.selected.elementRef, coveredRun.elementRef);
-  assert.equal(refreshedState.selectionRequest, 'freshness-select-node');
-  assert.equal(refreshedState.auditRequest, freshnessAudit.id);
-  const noLoopStarts = await freshnessStarts();
+  const historicalState = await assertHistoricalAudit(freshnessAudit, 1);
+  assert.equal(historicalState.selected.elementRef, coveredRun.elementRef);
+  assert.equal(historicalState.selectionRequest, 'freshness-select-node');
+  assert.equal(historicalState.auditRequest, freshnessAudit.id);
   await inspectFreshness(coveredRun.elementRef);
   await inspectFreshness(stableRun.elementRef, 'AAA');
   await freshness.evaluate(() => window.__command('refresh-selection'));
-  await freshness.waitForTimeout(80);
-  assert.equal(await freshnessStarts(), noLoopStarts, 'Unchanged explicit remeasurement never loops into additional audits');
-  assert.equal((await freshness.evaluate(() => window.__command('hello'))).audit.measuredAt, refreshedAudit.measuredAt);
+  await freshness.waitForTimeout(250);
+  await assertHistoricalAudit(freshnessAudit, 1);
 
+  const refreshedAudit = await scanFreshness('freshness-user-rescan');
+  assert.equal(refreshedAudit.stale, false);
+  assert.deepEqual(refreshedAudit.counts.contrast, { pass: 3, fail: 0, manual: 0, notApplicable: 0, assessed: 3 });
+  assert.deepEqual(refreshedAudit.fonts, ['Georgia, serif']);
+  assert.ok(!freshnessAudit.fonts.includes(refreshedAudit.fonts[0]), 'The user-requested scan replaces the font inventory');
+  assert.ok(refreshedAudit.palette.some(color => color.rgba?.r === 0 && color.rgba.g === 255 && color.rgba.b === 0));
+  assert.equal((await freshness.evaluate(() => window.__command('hello'))).selected, null);
+  const currentCovered = refreshedAudit.runs.find(run => run.selector === coveredRun.selector);
+  assert.ok(currentCovered);
+  assert.equal(currentCovered.id, coveredRun.id, 'An explicit rescan preserves the actual Text identity for comparison');
+  assert.equal((await freshness.evaluate(referenceId => window.__command('select-node', { referenceId }), coveredRun.elementRef)).ok, true, 'Remeasured DOM references remain selectable');
+  const reselectedCovered = (await freshness.evaluate(() => window.__command('hello'))).selected;
+  assert.equal(reselectedCovered.textRuns[0].id, currentCovered.id);
+  assert.equal(reselectedCovered.textRuns[0].contrast.ratio, currentCovered.contrast.ratio, 'The retained reference measures the current element paint');
+  await inspectFreshness(currentCovered.elementRef);
   await freshness.evaluate(() => { document.getElementById('dynamic-rules').sheet.insertRule('#covered { color: #232F3E; }', 2); });
-  const failureOffset = (await freshnessEvents()).length;
-  assert.equal((await inspectFreshness(coveredRun.elementRef)).textRuns[0].contrast.status, 'fail');
-  const failedAudit = await waitFreshnessAudit(failureOffset, refreshedAudit);
-  assert.equal(failedAudit.stale, false);
-  assert.deepEqual(failedAudit.counts.contrast, { pass: 2, fail: 1, manual: 0, notApplicable: 0, assessed: 3 });
-  assert.equal(failedAudit.runs.find(run => run.id === coveredRun.id).contrast.ratio, 1, 'A previous pass becomes a failure in the complete new audit');
+  assert.equal((await inspectFreshness(currentCovered.elementRef)).textRuns[0].contrast.status, 'fail');
+  await assertHistoricalAudit(refreshedAudit, 2);
 
   await freshness.locator('#covered').evaluate(node => { node.style.color = '#FFFFFF'; });
-  await freshness.waitForFunction(measuredAt => window.__events.some(event => event.audit?.measuredAt === measuredAt && event.audit.stale), failedAudit.measuredAt);
-  const staleOffset = (await freshnessEvents()).length;
+  await freshness.waitForFunction(() => window.__events.some(event => event.type === 'stale'));
   await freshness.evaluate(() => window.__command('refresh-selection'));
-  const recoveredAudit = await waitFreshnessAudit(staleOffset, failedAudit);
-  assert.equal(recoveredAudit.stale, false, 'An already-stale audit can also be refreshed by conflicting explicit evidence');
-  assert.deepEqual(recoveredAudit.counts.contrast, { pass: 3, fail: 0, manual: 0, notApplicable: 0, assessed: 3 });
-  assert.equal((await freshness.evaluate(() => window.__command('hello'))).selectionRequest, 'freshness-refresh-selection');
+  const recoveredSelection = (await freshness.evaluate(() => window.__command('hello'))).selected;
+  assert.equal(recoveredSelection.textRuns[0].contrast.status, 'pass');
+  assert.equal(recoveredSelection.stale, false);
+  await assertHistoricalAudit(refreshedAudit, 2);
 
-  const cancelOffset = (await freshnessEvents()).length;
-  await freshness.evaluate(async referenceId => {
-    document.getElementById('dynamic-rules').sheet.cssRules[0].style.display = 'block';
-    await window.__command('select-node', { referenceId, requestId: 'freshness-cancel-selection' });
-    // Both commands run before the audit's next timer batch, so cancellation
-    // is deterministic even for this deliberately small page.
-    await window.__command('cancel-audit');
-  }, coveredRun.elementRef);
-  const cancelledAudit = await waitFreshnessAudit(cancelOffset, recoveredAudit, 'cancelled');
-  assert.equal(cancelledAudit.runs.find(run => run.id === coveredRun.id).contrast.status, 'manual');
-  const cancelledState = await freshness.evaluate(() => window.__command('hello'));
-  assert.equal(cancelledState.selected.elementRef, coveredRun.elementRef);
-  assert.equal(cancelledState.selectionRequest, 'freshness-cancel-selection');
-  const cancelledStarts = await freshnessStarts();
-  await freshness.evaluate(() => { document.getElementById('dynamic-rules').sheet.cssRules[0].style.display = 'none'; });
-  assert.equal((await inspectFreshness(coveredRun.elementRef)).textRuns[0].contrast.status, 'pass');
-  await freshness.waitForTimeout(80);
-  assert.equal(await freshnessStarts(), cancelledStarts, 'A cancelled audit is not silently restarted by another inspection');
-  assert.equal((await freshness.evaluate(() => window.__command('hello'))).audit.status, 'cancelled');
-
-  const manualAudit = await scanFreshness('freshness-manual-restart');
-  const manualState = await freshness.evaluate(() => window.__command('hello'));
-  assert.equal(manualState.selected, null, 'A manual rescan still clears the confirmed selection');
-  assert.equal(manualState.selectionRequest, '');
-  assert.equal(manualState.auditRequest, manualAudit.id);
-  assert.equal((await freshness.evaluate(referenceId => window.__command('select-node', { referenceId }), coveredRun.elementRef)).error, 'element-removed', 'A manual rescan still retires old registry references');
-  const currentRef = await freshness.evaluate(async () => {
-    window.__styleInspectorContext = { requestId: 'freshness-capture-context', element: document.getElementById('covered') };
-    await window.__command('capture-context');
-    return window.__events.filter(event => event.type === 'selected').at(-1).snapshot.elementRef;
+  const burstAudit = await scanFreshness('freshness-before-mutation-burst');
+  const burstCovered = burstAudit.runs.find(run => run.selector === coveredRun.selector);
+  const burstSelection = await inspectFreshness(burstCovered.elementRef);
+  const burstOffset = (await freshnessEvents()).length;
+  // Repeated mutation deliveries and viewport changes used to schedule new
+  // measurements. These real browser events must only mark the snapshot stale.
+  await freshness.evaluate(async () => {
+    const target = document.getElementById('covered');
+    target.style.color = '#232F3E';
+    for (let batch = 0; batch < 40; batch++) {
+      for (let index = 0; index < 100; index++) target.dataset.testMutation = String(batch * 100 + index);
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
   });
-  const supersedeOffset = (await freshnessEvents()).length;
-  await freshness.evaluate(async referenceId => {
-    document.getElementById('dynamic-rules').sheet.cssRules[0].style.display = 'block';
-    await window.__command('select-node', { referenceId });
-    await window.__command('start-audit', { requestId: 'freshness-manual-supersedes-auto' });
-  }, currentRef);
-  await freshness.waitForFunction(() => window.__events.some(event => event.requestId === 'freshness-manual-supersedes-auto' && event.audit?.status === 'complete'));
-  await freshness.waitForTimeout(80);
-  const supersededEvents = (await freshnessEvents()).slice(supersedeOffset).filter(event => event.audit);
-  assert.equal(supersededEvents.filter(event => event.requestId === manualAudit.id && event.audit.status === 'running' && event.audit.scanned === 0).length, 1);
-  assert.equal(supersededEvents.filter(event => event.requestId === manualAudit.id && event.audit.status !== 'running').length, 0, 'An obsolete automatic job cannot overwrite the manually restarted audit');
-  const supersededState = await freshness.evaluate(() => window.__command('hello'));
-  assert.equal(supersededState.audit.id, 'freshness-manual-supersedes-auto');
-  assert.equal(supersededState.auditRequest, 'freshness-manual-supersedes-auto');
-  assert.equal(supersededState.selected, null);
-  assert.equal(supersededState.selectionRequest, '');
-  assert.deepEqual(supersededState.audit.counts.contrast, { pass: 2, fail: 0, manual: 1, notApplicable: 0, assessed: 3 });
+  await freshness.setViewportSize({ width: 980, height: 850 });
+  await freshness.evaluate(() => window.dispatchEvent(new Event('scroll')));
+  await freshness.waitForTimeout(350);
+  const burstState = await assertHistoricalAudit(burstAudit, 3);
+  assert.deepEqual(burstState.selected, { ...burstSelection, stale: true }, 'Mutations, scrolling, resize and hello keep the previous selected measurement');
+  const burstEvents = (await freshnessEvents()).slice(burstOffset);
+  assert.equal(burstEvents.filter(event => event.type === 'selected').length, 0, 'The selected element is never automatically remeasured');
+  assert.equal(burstEvents.filter(event => event.audit).length, 1, 'The audit publishes one stale notice and then stays idle across 4,000 mutations');
+  assert.equal(burstEvents.filter(event => event.type === 'stale').length, 1, 'The selection publishes one stale notice and then stays idle');
+  await freshness.evaluate(() => window.__command('refresh-selection'));
+  const explicitRefresh = (await freshness.evaluate(() => window.__command('hello'))).selected;
+  assert.equal(explicitRefresh.stale, false);
+  assert.equal(explicitRefresh.textRuns[0].contrast.status, 'fail');
+  assert.ok(Date.parse(explicitRefresh.measuredAt) > Date.parse(burstSelection.measuredAt));
+  await assertHistoricalAudit(burstAudit, 3);
+  await freshness.evaluate(() => { document.getElementById('covered').style.color = '#FFFFFF'; });
+  await freshness.waitForFunction(measuredAt => window.__events.some(event => event.type === 'stale' && event.snapshot?.measuredAt === measuredAt), explicitRefresh.measuredAt);
+  assert.equal((await freshness.evaluate(() => window.__command('hello'))).selected.textRuns[0].contrast.status, 'fail', 'Monitoring rearms after explicit refresh without automatically measuring the next change');
+
+  const finalAudit = await scanFreshness('freshness-final-user-scan');
+  const finalState = await freshness.evaluate(() => window.__command('hello'));
+  assert.equal(finalAudit.stale, false);
+  assert.deepEqual(finalAudit.counts.contrast, { pass: 3, fail: 0, manual: 0, notApplicable: 0, assessed: 3 });
+  assert.equal(finalState.selected, null);
+  assert.equal(finalState.selectionRequest, '');
+  assert.equal(finalState.auditRequest, finalAudit.id);
   await assertMeasurementEventsTextFree(freshness, /Covered navigation link|Stable navigation link|Unrelated fresh selection/);
   await freshness.close();
-  findings.push({ check: 'Conflicting explicit measurements refresh the full audit, counts, palette and fonts while preserving selection, registry and request; reverse failures and already-stale audits update, unchanged/target-only/unrelated/preview measurements do not loop, cancellation and manual supersession are respected', passed: true });
+  findings.push({ check: 'Explicit inspection and selection refresh never rescan the page; contradictory measurements mark historical audit data stale, 4,000 DOM mutations plus resize/scroll produce only one stale notice per snapshot, cached hello never remeasures, and only explicit scans replace counts, palette and fonts while preserving surviving Text identities', passed: true });
   const visibility = await browser.newPage({ viewport: { width: 1000, height: 900 } });
   await visibility.goto(`${host.url}/tests/fixtures/text-visibility.html`);
   await visibility.evaluate(({ defaults, en }) => {
@@ -625,7 +700,10 @@ try {
       assert.equal(run.contrast.ratio, null, id);
       assert.equal(run.contrast.reason, reason, id);
       assert.deepEqual(run.reasons, reasons ?? [reason], id);
-      if (reason === 'layered-background' || reason === 'unresolved-background') assert.equal(run.effectiveBackground, null, id);
+      if (['absolute-parent', 'relative-moved', 'transformed-parent', 'negative-margin', 'floated-parent'].includes(id)) {
+        assert.deepEqual(run.effectiveBackground, { r: 15, g: 15, b: 15, a: 1 }, `${id}: enclosing CSS surface remains available`);
+        assert.equal(run.contrast.AA.status, 'manual', `${id}: the CSS pair does not certify page paint`);
+      } else if (reason === 'layered-background' || reason === 'unresolved-background') assert.equal(run.effectiveBackground, null, id);
     }
   }
   const scanOffscreen = async requestId => {
@@ -823,7 +901,7 @@ try {
   const splitAudit = await scanSplit('split-initial');
   assert.equal(splitAudit.runs.length, 21);
   for (const { id, count, uncertain } of splitCases) {
-    // A fresh audit intentionally retires previous element references.
+    // Match actual live DOM identities without depending on generated labels.
     const snapshot = await inspectSplit(id);
     const runs = splitAudit.runs.filter(run => run.elementRef === snapshot.elementRef);
     assert.equal(runs.length, count, id);
@@ -1156,10 +1234,15 @@ try {
   assert.equal(refreshedExcerpt.textExcerpt.value, 'Updated selection excerpt.');
   noExcerpt(await scanExcerpts('excerpts-rescan'));
   assert.equal((await excerpts.evaluate(() => window.__command('hello'))).selected, null, 'Rescan clears the old excerpt with its selection');
-  await inspectExcerpt('simple');
+  const beforeClearExcerpt = await inspectExcerpt('simple');
   await excerpts.evaluate(() => window.__command('clear-data'));
   const clearedExcerpts = await excerpts.evaluate(() => window.__command('hello'));
   assert.equal(clearedExcerpts.selected, null); assert.equal(clearedExcerpts.audit, null);
+  assert.equal((await excerpts.evaluate(referenceId => window.__command('select-node', { referenceId }), beforeClearExcerpt.elementRef)).error, 'element-removed', 'Explicit data clearing permanently retires former selectable references');
+  const afterClearExcerpt = await inspectExcerpt('simple');
+  assert.notEqual(afterClearExcerpt.elementRef, beforeClearExcerpt.elementRef);
+  assert.notEqual(afterClearExcerpt.textRuns[0].id, beforeClearExcerpt.textRuns[0].id, 'New inspection after clearing starts fresh comparison identities');
+  assert.equal(afterClearExcerpt.textExcerpt.value, 'Updated selection excerpt.');
   assert.doesNotMatch(JSON.stringify(await excerpts.evaluate(() => window.__events)), /PRIVATE_[A-Z_]+_SENTINEL/);
   await assertMeasurementEventsTextFree(excerpts, /Selected text|Updated selection|First visible excerpt/);
   await excerpts.close();

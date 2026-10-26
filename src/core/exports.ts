@@ -1,6 +1,7 @@
 import { formatColor, isRGBA, parseColor } from './colors';
 import { contrastRatio, cssColorContrast, evaluateRun, reassessAudit } from './contrast';
 import { isBackgroundRange } from './gradients';
+import { getFontEntries, getPaletteEntries } from './style-inventory';
 import type { Audit, ColorFormat, ColorValue, ExportOptions, ExportResult, ExportSource, ExportWarning, MeasuredStyles, Snapshot, StyleGroup, TextRun } from './types';
 
 /** Physical longhands win; no shorthand/longhand duplicates or inferred values. */
@@ -76,7 +77,27 @@ function collectStyles(styles: MeasuredStyles, options: ExportOptions, warnings:
   return result;
 }
 function metadata(data: Snapshot | Audit) {
-  return { measuredAt: data.measuredAt, viewport: { width: data.viewport.width, height: data.viewport.height }, stale: data.stale, limitations: data.reasons, ...('status' in data ? { scanStatus: data.status, scanned: data.scanned, skipped: data.skipped, total: data.total } : {}) };
+  const inventory = 'status' in data ? data.inventoryLimits : undefined;
+  const inventoryFields = ['maxColors', 'maxFontFamilies', 'maxFontSizes', 'maxFontVariants', 'maxElements'] as const;
+  const inventoryLimits = inventory && inventoryFields.every(key => Number.isSafeInteger(inventory[key]) && inventory[key] > 0)
+    ? { ...Object.fromEntries(inventoryFields.map(key => [key, inventory[key]])),
+      reached: Array.isArray(inventory.reached) ? [...new Set(inventory.reached.filter(value => ['colors', 'font-families', 'font-sizes', 'font-variants', 'elements'].includes(value)))] : [] } : undefined;
+  const scopeViewport = 'status' in data && data.scope === 'viewport' ? data.scopeViewport : undefined;
+  const scan = 'status' in data ? {
+    scanStatus: data.status, scanned: data.scanned, skipped: data.skipped, total: data.total,
+    ...(data.scope && ['page', 'viewport', 'selection'].includes(data.scope) ? { scope: data.scope } : {}),
+    ...(typeof data.durationMs === 'number' && Number.isFinite(data.durationMs) && data.durationMs >= 0 ? { durationMs: data.durationMs } : {}),
+    ...(Number.isSafeInteger(data.examined) && data.examined! >= 0 ? { examined: data.examined } : {}),
+    ...(data.limits && Number.isSafeInteger(data.limits.maxRuns) && data.limits.maxRuns > 0
+      && Number.isSafeInteger(data.limits.maxElements) && data.limits.maxElements > 0
+      ? { limits: { maxRuns: data.limits.maxRuns, maxElements: data.limits.maxElements } } : {}),
+    ...(Array.isArray(data.reachedLimits) ? { reachedLimits: [...new Set(data.reachedLimits.filter(value => ['text-runs', 'elements', 'complexity'].includes(value)))] } : {}),
+    ...(inventoryLimits ? { inventoryLimits } : {}),
+    ...(scopeViewport && (['left', 'top', 'width', 'height'] as const).every(key => Number.isFinite(scopeViewport[key]))
+      && scopeViewport.width > 0 && scopeViewport.height > 0
+      ? { scopeViewport: { left: scopeViewport.left, top: scopeViewport.top, width: scopeViewport.width, height: scopeViewport.height } } : {}),
+  } : {};
+  return { measuredAt: data.measuredAt, viewport: { width: data.viewport.width, height: data.viewport.height }, stale: data.stale, limitations: data.reasons, ...scan };
 }
 function publicColor(value: ColorValue) {
   // Unknown modern color spaces may be metadata, but never executable styles.
@@ -90,6 +111,7 @@ function publicRun(run: TextRun, index: number) {
   return {
     reference: `text-${String(index + 1).padStart(4, '0')}`, tagName: /^[a-z][a-z0-9-]{0,63}$/.test(run.tagName) ? run.tagName : 'element',
     ...(run.textSource === 'placeholder' ? { textSource: 'placeholder' } : {}),
+    ...(run.viewportPartial === true ? { viewportPartial: true } : {}),
     foreground: publicColor(run.foreground), cssBackground: publicColor(run.background), effectiveBackground: run.effectiveBackground,
     ...(isBackgroundRange(run.backgroundRange) ? { backgroundRange: run.backgroundRange } : {}),
     fontSizeCssPx: run.fontSizeCssPx, fontWeight: run.fontWeight,
@@ -103,7 +125,9 @@ function styleJSON(declarations: Declaration[]) {
 function pageTokens(audit: Audit, options: ExportOptions, warnings: ExportWarning[]): Declaration[] {
   const result: Declaration[] = [];
   const colors = new Map<string, ColorValue>();
-  for (const color of audit.palette.slice(0, 1024)) {
+  const palette = options.inventory === 'measured' ? getPaletteEntries(audit).map(entry => entry.color) : audit.palette;
+  const fonts = options.inventory === 'measured' ? getFontEntries(audit).map(entry => entry.family) : audit.fonts;
+  for (const color of palette.slice(0, 1024)) {
     if (!isRGBA(color.rgba)) { warnings.push({ code: 'unsupported-palette-color' }); continue; }
     const canonical = formatColor(color.rgba, 'rgb');
     colors.set(canonical, color);
@@ -112,7 +136,7 @@ function pageTokens(audit: Audit, options: ExportOptions, warnings: ExportWarnin
     const color = colors.get(key)!;
     result.push({ property: `sil-color-${String(index + 1).padStart(3, '0')}`, raw: publicColor(color).raw ?? formatColor(color.rgba!, 'rgb'), value: formatColor(color.rgba!, options.colorFormat ?? 'hex'), group: 'colors' });
   });
-  [...new Set(audit.fonts)].sort().slice(0, 512).forEach((font, index) => {
+  [...new Set(fonts)].sort().slice(0, 512).forEach((font, index) => {
     if (!safeValue('font-family', font)) { warnings.push({ code: 'unsupported-font-family' }); return; }
     result.push({ property: `sil-font-${String(index + 1).padStart(3, '0')}`, raw: font, value: font, group: 'typography' });
   });
@@ -154,11 +178,14 @@ export function serializeColorVariables(snapshot: Snapshot, colorFormat: ColorFo
 export function serializeExport(source: ExportSource, options: ExportOptions): ExportResult {
   if (!/^\d+\.\d+\.\d+$/.test(options.version)) throw new Error('invalid-generator-version');
   if (!['css', 'scss', 'json', 'tailwind'].includes(options.format)) throw new Error('unsupported-export-format');
+  if (options.inventory !== undefined && !['measured', 'css'].includes(options.inventory)) throw new Error('unsupported-export-inventory');
   if (source.kind === 'audit' && options.format !== 'json') throw new Error('audit-requires-json');
   const warnings: ExportWarning[] = [];
   const data = 'snapshot' in source ? source.snapshot : source.audit;
   if (data.stale) warnings.push({ code: 'stale-measurement' });
   if ('status' in data && data.status !== 'complete') warnings.push({ code: 'partial-scan' });
+  if ('status' in data && Array.isArray(data.inventoryLimits?.reached)
+    && data.inventoryLimits.reached.some(value => ['colors', 'font-families', 'font-sizes', 'font-variants', 'elements'].includes(value))) warnings.push({ code: 'partial-style-inventory' });
   const className = safeClass(options.className);
   const isPage = source.kind === 'page-tokens';
   const target = options.target ?? ('audit' in source ? source.audit.target : source.snapshot.textRuns[0]?.contrast.target ?? 'AA');
@@ -198,6 +225,13 @@ export function serializeExport(source: ExportSource, options: ExportOptions): E
   const dimensions = [data.viewport.width, data.viewport.height].every(n => Number.isFinite(n) && n >= 0) ? `${data.viewport.width}x${data.viewport.height}` : 'unknown';
   let origin = source.kind === 'contrast-suggestion' ? 'Contrast suggestion; not applied. Only this text run and unchanged opposite color are covered.' : 'Generated from measured styles. Export names are generated, not original design tokens.';
   origin += ` Measured: ${measured}; page viewport: ${dimensions} CSS px.`;
+  if (source.kind === 'page-tokens') {
+    if (options.inventory) origin += options.inventory === 'measured' ? ' Inventory: page overview (measured usage).' : ' Inventory: raw element CSS.';
+    const scope = source.audit.scope;
+    const scopeLabel = scope === 'page' ? 'whole page' : scope === 'viewport' ? 'initial visible area' : scope === 'selection' ? 'selected section' : null;
+    const status = ['running', 'complete', 'partial', 'cancelled'].includes(source.audit.status) ? source.audit.status : 'unknown';
+    if (scopeLabel) origin += ` Audit scope: ${scopeLabel}; audit status: ${status}.`;
+  }
   if (source.kind === 'contrast-suggestion' && suggestionJSON) {
     origin += ` Original foreground: ${formatColor(source.suggestion.foreground)}; original background: ${formatColor(source.suggestion.background)}. Target: ${source.suggestion.target}; threshold: ${suggestionJSON.threshold}:1; before: ${suggestionJSON.beforeRatio}:1; after: ${suggestionJSON.afterRatio}:1. Font size and weight must remain unchanged.`;
   }
@@ -207,7 +241,7 @@ export function serializeExport(source: ExportSource, options: ExportOptions): E
   if (options.format === 'json') {
     const json: Record<string, unknown> = { schemaVersion: 2, generator: { name: 'Style Inspector Lite', version: options.version }, kind: source.kind, metadata: metadata(data), warnings };
     if (source.kind === 'element') Object.assign(json, { groups, generatedSelector: `.${className}`, styles: styleJSON(declarations), textRuns: source.snapshot.textRuns.map((r, i) => publicRun(evaluateRun(r, target), i)), visualRect: { width: source.snapshot.rect.width, height: source.snapshot.rect.height }, target });
-    if (source.kind === 'page-tokens') Object.assign(json, { generatedTokens: declarations.map(d => ({ name: d.property, origin: 'generated', group: d.group, raw: d.raw, value: d.value })), target });
+    if (source.kind === 'page-tokens') Object.assign(json, { generatedTokens: declarations.map(d => ({ name: d.property, origin: 'generated', group: d.group, raw: d.raw, value: d.value })), target, ...(options.inventory ? { inventory: options.inventory } : {}) });
     if (source.kind === 'audit') {
       const audit = reassessAudit(source.audit, target);
       Object.assign(json, { target, ruleDefinitions: [{ ruleId: 'text.contrast', normative: true, normal: { AA: 4.5, AAA: 7 }, large: { AA: 3, AAA: 4.5 } }, { ruleId: 'text.font-size-min', thresholdCssPx: 12, operator: 'lt', category: 'readability', normative: false }], counts: audit.counts, textRuns: audit.runs.map(publicRun), palette: audit.palette.map(publicColor), cssFontFamilies: audit.fonts.filter(font => safeValue('font-family', font)), recommendations: [] });

@@ -9,6 +9,7 @@ import { serve, root, defaults, message } from './support.mjs';
 // explicit test data, never injected into the production extension at runtime.
 const baseline = process.argv.includes('--baseline');
 const { fixtureRun, fixtureSnapshot, fixtureAudit } = await tsImport('../fixtures/export/data.ts', import.meta.url);
+const { parseColor } = await tsImport('../../src/core/colors.ts', import.meta.url);
 const bad = fixtureRun(), good = { ...fixtureRun('#707070', '#ffffff', 16), id: 'good', elementRef: 'good' };
 const manual = { ...fixtureRun('#17243a', '#ffffff', 16), id: 'manual', elementRef: 'manual', effectiveBackground: null, reasons: ['background-image'] };
 const cssSample = { ...fixtureRun('#0F1111', '#FFA41C', 14), id: 'css-sample', elementRef: 'css-sample', reasons: ['overlapping-element'] };
@@ -19,6 +20,17 @@ const cssUnknown = { ...cssSample, id: 'css-unknown', elementRef: 'css-unknown',
 const exempt = { ...fixtureRun('#17243a', '#ffffff', 16), id: 'exempt', elementRef: 'exempt', notApplicable: 'inactive-control' };
 const large = { ...fixtureRun('#707070', '#ffffff', 24), id: 'large', elementRef: 'large' };
 const snapshot = fixtureSnapshot(bad), audit = fixtureAudit([bad, good, manual, cssSample, exempt, large]);
+audit.paletteUsage = [
+  { color: parseColor('#FFFFFF'), count: 21, roles: { background: 21, text: 2 } },
+  { color: parseColor('#707070'), count: 8, roles: { text: 8 } },
+  { color: parseColor('#0066CC'), count: 6, roles: { accent: 6 } },
+  { color: parseColor('#00000000'), count: 30, roles: { other: 30 } },
+];
+audit.fontUsage = [{ family: audit.fonts[0], count: 21, sizes: [{ sizeCssPx: 12, count: 7 }, { sizeCssPx: 14.5, count: 5 }, { sizeCssPx: 16, count: 8 }, { sizeCssPx: null, count: 1 }] }];
+audit.paletteUsage[0].elementRefs = [bad.elementRef, good.elementRef];
+audit.fontUsage[0].elementRefs = [bad.elementRef, good.elementRef];
+audit.fontUsage[0].sizes[0].elementRefs = [bad.elementRef];
+audit.fontUsage[0].variants = [{ sizeCssPx: 16, fontWeight: 400, lineHeight: '24px', count: 2, elementRefs: [bad.elementRef, good.elementRef] }, { sizeCssPx: 20, fontWeight: 700, lineHeight: 'normal', count: 1, elementRefs: [good.elementRef] }];
 snapshot.textExcerpt = { value: 'Synthetic selected element excerpt for the interface contrast check.', truncated: true };
 snapshot.textRuns[0].textExcerpt = { value: 'Synthetic selected text area.', truncated: false };
 snapshot.styles.colors['border-top-color'] = '#12345680';
@@ -169,7 +181,7 @@ try {
     const check = async (view, interactions = false) => {
       await page.mouse.move(0, 0);
       await inspect(page, { locale, theme, view, interaction: 'normal' });
-      if (interactions) for (const selector of ['.footer .primary', '.picker', '.tab[aria-selected="true"]', '.filter-bar button[aria-pressed="true"]', '.danger', '.actions button', '.show-node', '.suggestion-color button', '.section-title button', 'input[type="text"]', '#manual-foreground-picker', '#manual-foreground-hue', '#manual-foreground-saturation', '#manual-foreground-value', 'select', '.clipboard-fallback']) {
+      if (interactions) for (const selector of ['.footer .primary', '.picker', '.tab[aria-selected="true"]', '.filter-bar button[aria-pressed="true"]', '.danger', '.actions button', '.show-node', '.suggestion-color button', '.section-title button', 'input[type="text"]', '#show-diagnostics', '#manual-foreground-picker', '#manual-foreground-hue', '#manual-foreground-saturation', '#manual-foreground-value', 'select', '.clipboard-fallback', '.inventory-matches', '.palette-use-text', '.palette-use-background', '.diagnostic-copy', '.font-variants > summary', '.audit-group > summary']) {
         const control = page.locator(selector).first();
         if (!await control.count() || !await control.isVisible() || !await control.isEnabled()) continue;
         await control.hover(); await inspect(page, { locale, theme, view, interaction: 'hover' }, selector);
@@ -182,6 +194,13 @@ try {
       await page.locator(`#tab-${tab}`).click();
       await page.locator('details').evaluateAll(nodes => nodes.forEach(node => { node.open = true; }));
       await check(tab, true);
+      if (!baseline && ['audit', 'contrast'].includes(tab)) {
+        assert.equal(await page.locator('.diagnostic-copy').count(), 0, `${tab}: diagnostics hidden by default`);
+        await page.evaluate(() => window.__emit({ settings: { ...window.__state.settings, showDiagnostics: true }, lastEvent: 'settings' }));
+        assert.ok(await page.locator('.diagnostic-copy').count() > 0, `${tab}: opted-in diagnostics visible`);
+        await check(`${tab}-diagnostics-enabled`, true);
+        await page.evaluate(() => window.__emit({ settings: { ...window.__state.settings, showDiagnostics: false }, lastEvent: 'settings' }));
+      }
       if (tab === 'contrast') {
         const simulation = page.getByLabel(label('simulationMode'));
         for (const mode of ['protanopia', 'deuteranopia', 'tritanopia', 'grayscale']) { await simulation.selectOption(mode); await check(`simulation-${mode}`); }
@@ -234,22 +253,65 @@ try {
         await page.evaluate(({ audit, status }) => window.__emit({ selected: null, preview: null, audit: { ...audit, status, stale: status === 'partial' }, lastEvent: 'ready' }), { audit, status });
         await page.locator(`#tab-${tab}`).click();
         await check(`page-${tab}-${status}`, status === 'complete');
+        if (status === 'complete') {
+          await page.locator('details.palette-actions,details.font-variants').evaluateAll(nodes => nodes.forEach(node => { node.open = true; }));
+          await check(`page-${tab}-actions`, true);
+          const matching = page.locator(tab === 'colors' ? '.palette-item .inventory-matches:enabled' : '.font-usage-item > .inventory-matches:enabled').first();
+          await matching.click(); await check(`page-${tab}-occurrences`, true);
+          await page.locator('.section-title > .back').click();
+          await page.setViewportSize({ width: 280, height: 800 });
+          if (tab === 'colors') {
+            for (const sort of ['usage', 'frequency', 'hue']) {
+              await page.locator('#palette-sort').selectOption(sort);
+              await check(`page-colors-${sort}-narrow`, true);
+            }
+            await page.locator('#palette-sort').selectOption('usage');
+          } else {
+            for (const sort of ['frequency', 'size-asc', 'size-desc']) {
+              await page.locator('#font-sort').selectOption(sort);
+              await check(`page-font-sizes-${sort}-narrow`, true);
+            }
+            await page.locator('#font-sort').selectOption('frequency');
+          }
+          await page.setViewportSize({ width: 380, height: 800 });
+        }
       }
-      await page.evaluate(audit => window.__emit({ audit: { ...audit, fonts: [], palette: [] }, lastEvent: 'ready' }), audit);
+      await page.evaluate(audit => window.__emit({ audit: { ...audit, fonts: [], palette: [], paletteUsage: [], fontUsage: [] }, lastEvent: 'ready' }), audit);
       await check(`page-${tab}-empty`);
       await page.evaluate(() => window.__emit({ audit: null, lastEvent: 'ready' }));
       await check(`page-${tab}-not-scanned`, true);
     }
     await page.evaluate(({ snapshot, audit }) => window.__emit({ selected: snapshot, audit, lastEvent: 'ready' }), { snapshot, audit });
     await page.locator('#tab-audit').click();
+    const repeat = { ...good, id: 'group-repeat', elementRef: 'group-repeat' };
+    await page.evaluate(audit => window.__emit({ audit, lastEvent: 'audit' }), fixtureAudit([good, repeat, manual, cssSample]));
+    await page.locator('#audit-group-results').check();
+    await page.locator('.audit-group > summary').click(); await page.locator('.audit-group .occurrence-item').first().waitFor();
+    await check('audit-group-expanded', true);
+    await page.locator('#audit-group-results').uncheck();
+    await page.evaluate(audit => window.__emit({ audit, lastEvent: 'audit' }), audit);
     await page.evaluate(() => window.__emit({ settings: { ...window.__state.settings, contrastTarget: 'AAA' }, lastEvent: 'ready' }));
     await check('audit-aaa', true);
     await page.evaluate(() => window.__emit({ settings: { ...window.__state.settings, contrastTarget: 'AA' }, lastEvent: 'ready' }));
     await page.locator('.header button').click(); await check('settings', true);
+    if (!baseline) {
+      assert.equal(await page.locator('#show-diagnostics').isChecked(), false);
+      await page.locator('#show-diagnostics').check(); await check('settings-diagnostics-enabled', true);
+      await page.locator('#show-diagnostics').uncheck();
+    }
     await page.getByRole('button', { name: label('clearData'), exact: true }).click(); await check('clear-confirmation', true);
     await page.getByRole('button', { name: label('actionCancel'), exact: true }).click();
     await page.locator('#tab-colors').click(); await page.locator('.footer button:last-child').click();
     for (const format of ['css', 'scss', 'json', 'tailwind']) { await page.getByLabel(label('exportFormat'), { exact: true }).selectOption(format); await check(`export-${format}`, true); }
+    if (!baseline) {
+      const largeAudit = fixtureAudit(Array.from({ length: 100 }, (_, index) => ({ ...good, id: `export-${index}`, elementRef: `export-${index}` })));
+      await page.evaluate(audit => window.__emit({ audit, lastEvent: 'audit' }), largeAudit);
+      await page.locator('#tab-audit').click(); await page.locator('.footer button:last-child').click();
+      await page.getByLabel(label('exportSource'), { exact: true }).selectOption('audit');
+      assert.equal(await page.locator('.export-preview-truncated').count(), 1);
+      await check('export-shortened-preview');
+      await page.evaluate(audit => window.__emit({ audit, lastEvent: 'audit' }), audit);
+    }
     await page.locator('#tab-colors').click(); await page.evaluate(() => { window.__failClipboard = true; });
     await page.locator('.footer button:first-child').click(); await check('clipboard-fallback-and-toast');
     await page.getByRole('button', { name: label('actionClose'), exact: true }).click();
@@ -276,6 +338,12 @@ try {
         await page.locator('#manual-foreground-sv').click({position:{x:60,y:40}}); await check('manual-picker-colored', true);
         await page.setViewportSize({ width: 280, height: 650 }); await check('manual-narrow', true);
         await page.locator('#manual-foreground-hue').press('Escape');
+        await page.locator('#manual-background-hex').fill('rgb(10 20 30 / .4)');
+        await check('manual-transparent-background-missing-underlay', true);
+        await page.locator('#manual-underlay-hex').fill('#FFFFFF');
+        await check('manual-transparent-background-explicit-underlay', true);
+        await page.locator('#manual-underlay-hex').fill('rgb(0 0 0 / .5)');
+        await check('manual-transparent-underlay-invalid', true);
         await page.setViewportSize({ width: 380, height: 800 });
       }
       await page.locator('#tab-audit').click();
@@ -292,7 +360,7 @@ try {
   await mkdir(path.join(root, 'test-results'), { recursive: true });
   const reportFile = path.join(root, 'test-results', baseline ? 'sidebar-contrast-baseline.json' : 'sidebar-contrast.json');
   Object.assign(report, { nonTextMeasurements: graphics.length, nonTextFailures, nonTextPerTheme: Object.fromEntries(['light', 'dark'].map(theme => [theme, minimum(graphics.filter(row => row.theme === theme))])) });
-  report.scope += ' Manual opaque HEX/inline-color calculator, open palettes, invalid values and narrow layout. Independently measured editable field boundaries, currentColor SVG shapes and CSS focus outlines meet 3:1; decorative lines, selected color swatches, palette gradients and native widget interiors are excluded.';
+  report.scope += ' Inventory actions and occurrence lists, font variants, expanded audit groups and diagnosis controls. Manual HEX/RGB-alpha calculator with explicit underlying surfaces, open palettes, invalid values and narrow layout. Independently measured editable field boundaries, currentColor SVG shapes and CSS focus outlines meet 3:1; decorative lines, selected color swatches, palette gradients and native widget interiors are excluded.';
   await writeFile(reportFile, JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ reportFile, states: report.states, textMeasurements: rows.length, nonTextMeasurements: graphics.length, nonTextFailures: nonTextFailures.length, nonTextPerTheme: report.nonTextPerTheme, failures: failures.length, fontSizesBelow12: small.length, minimumEnabled: report.minimumEnabled, minimumDisabled: report.minimumDisabled, perTheme: report.perTheme }, null, 2));
   assert.deepEqual(errors, [], 'No sidebar page errors');

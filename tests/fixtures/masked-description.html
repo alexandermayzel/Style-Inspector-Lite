@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Masked description text and a separate expansion control</title>
+<style>
+  html { font-size: 10px; background: #0f0f0f; }
+  body { margin: 16px; color: #f1f1f1; font: 14px/20px Arial, sans-serif; }
+  .description { width: 800px; padding: 12px; margin-bottom: 20px; border-radius: 12px; background: rgb(255 255 255 / .1); }
+  .outer { position: relative; height: 60px; overflow: hidden; }
+  .snippet { height: 60px; overflow: hidden; white-space: pre-wrap;
+    mask-image: linear-gradient(to top, transparent 0%, transparent 2rem, black 2rem, black 100%),
+      linear-gradient(to right, black 0%, black -21px, transparent 3px, transparent 100%); }
+  .spacer { height: 40px; }
+  .ellipsis { display: inline-block; width: 0; }
+  .sizer { display: inline-block; visibility: hidden; }
+  .expand { position: absolute; left: 3px; bottom: 0; font-weight: 500; }
+  .partial .snippet { mask-image: linear-gradient(to top, transparent 0%, transparent 8px, black 8px, black 100%),
+    linear-gradient(to right, black 0%, black -21px, transparent 3px, transparent 100%); }
+  .unknown .snippet { mask-image: radial-gradient(black, transparent); }
+  .texture .snippet { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath fill='black' fill-opacity='.5' d='M0 0h10v10H0z'/%3E%3C/svg%3E"); }
+  .none .snippet { mask-image: none; }
+  .partial .expand, .unknown .expand, .texture .expand, .none .expand { left: 120px; }
+</style>
+<div id="cases"></div>
+<script>
+  for (const kind of ['hidden', 'partial', 'unknown', 'texture', 'none']) {
+    const row = document.createElement('div'); row.className = `description ${kind}`; row.id = kind;
+    row.innerHTML = `<div class="outer"><div class="snippet"><div class="spacer"></div><span>&nbsp;</span><span class="ellipsis" id="${kind}-ellipsis">…</span><synthetic-button class="sizer">...more</synthetic-button></div><synthetic-button class="expand" id="${kind}-expand">...more</synthetic-button></div>`;
+    document.getElementById('cases').append(row);
+  }
+</script>
+</html>

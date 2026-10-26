@@ -6,7 +6,7 @@ export const SETTINGS_VERSION = 1;
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   schemaVersion: 1,
   appearance: 'system', colorFormat: 'hex', contrastTarget: 'AA',
-  livePreview: true, contextMenuEnabled: true,
+  livePreview: true, contextMenuEnabled: true, showDiagnostics: false,
 });
 
 export function validateSettings(value: unknown): Settings {
@@ -20,6 +20,7 @@ export function validateSettings(value: unknown): Settings {
     contrastTarget: target === 'AA' || target === 'AAA' ? target : 'AA',
     livePreview: typeof data.livePreview === 'boolean' ? data.livePreview : true,
     contextMenuEnabled: typeof data.contextMenuEnabled === 'boolean' ? data.contextMenuEnabled : true,
+    showDiagnostics: data.showDiagnostics === true,
   };
 }
 

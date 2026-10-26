@@ -23,6 +23,12 @@ are neutral sequence numbers; no selectors, input text, tab or document tokens
 are serialized. Shown-placeholder measurements carry optional `textSource:
 "placeholder"` metadata, without their text contents. Element CSS exports still
 describe the element itself; placeholder color suggestions are not supported.
+Page-token exports can explicitly choose `inventory: "measured"` for the bounded
+Colors/Typography overview (including placeholder styles and resolved surfaces)
+or `inventory: "css"` for raw element properties. The JSON records that choice;
+text formats label it in their generated header. Calls without this option keep
+the existing raw-CSS contract. Both use stable generated names, omit private
+references and ignore display-only sorting or filters.
 Supported linear gradients carry optional `backgroundRange: { min, max }`
 metadata: opaque, componentwise sRGB bounds, not actual sampled colors. Their
 `effectiveBackground` is null and `contrast.ratioKind` is `"minimum"` when a lower

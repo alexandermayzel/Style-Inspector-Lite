@@ -1,41 +1,55 @@
 import { evaluateRun, reassessAudit } from './core/contrast';
+import { diagnosticMeasurement, diagnosticVersion, sanitizeDiagnostic, type DiagnosticReport } from './core/diagnostics';
 import type { Audit, Settings, Snapshot } from './core/types';
 import { DEFAULT_SETTINGS, SETTINGS_KEY, settingsRecord, validateSettings } from './runtime/settings';
-import { boundedSession, emptySession, identityMatches, safeFilename, SESSION_KEY, type DocumentRecord, type SessionData } from './runtime/state';
+import { AnalysisBudget, boundedSession, emptySession, identityMatches, restoreAuthorizations, safeFilename, MAX_ANALYSIS_BYTES, MAX_ANALYSIS_RECORDS, SESSION_KEY, type DocumentRecord } from './runtime/state';
 import { isSidebarCommand, type ContentCommand, type ContentEvent, type SidebarCommand, type SidebarMessage, type SidebarState, type StateEvent } from './runtime/protocol';
 
 const MENU_ID = 'style-inspector-lite-inspect';
 let settings: Settings = { ...DEFAULT_SETTINGS };
 let session = emptySession();
+const coordinatorToken = crypto.randomUUID();
 const windows = new Map<number, SidebarState>();
 const ports = new Map<browser.runtime.Port, number>();
+const connectedPorts = new WeakSet<browser.runtime.Port>();
 const attempts = new Map<number, string>();
 const activationJobs = new Map<number, Promise<DocumentRecord | null>>();
 const contextRequests = new Map<number, string>();
 const windowRevisions = new Map<number, number>();
 // Handshakes may return after newer commands or content events. These revisions
-// protect live analysis without changing the persisted document/request IDs.
+// protect live analysis without changing the document/request IDs.
 const recordRevisions = new WeakMap<DocumentRecord, number>();
+const diagnosticRequests = new WeakMap<browser.runtime.Port, string>();
+const analysisListRequests = new WeakMap<browser.runtime.Port, string>();
+const pendingAuditStarts = new WeakMap<DocumentRecord, { requestId: string; selectionRequest: string; auditRequest: string }>();
+const pendingSelections = new WeakMap<DocumentRecord, Set<string>>();
+const releasedAnalysis = new WeakSet<DocumentRecord>();
 const recordChanged = (record: DocumentRecord) => recordRevisions.set(record, (recordRevisions.get(record) ?? 0) + 1);
 const downloadOwners = new Map<number, { url: string; requestId: string; windowId: number; persisted: Promise<void> }>();
 const downloadFinalizations = new Map<number, Promise<void>>();
-let storageQueue: Promise<void> = Promise.resolve();
+const analysisBudget = new AnalysisBudget();
+let storageQueue: Promise<void> | null = null;
+let storageDirty = false;
 let menuQueue: Promise<void> = Promise.resolve();
 let settingsQueue: Promise<void> = Promise.resolve();
 
-const loaded = Promise.all([browser.storage.local.get(SETTINGS_KEY), browser.storage.session.get(SESSION_KEY)]).then(([local, temporary]) => {
-  settings = validateSettings(local[SETTINGS_KEY]);
-  const previous = temporary[SESSION_KEY] as SessionData | undefined;
-  if (previous?.schemaVersion === 1 && Number.isSafeInteger(previous.epoch) && previous.documents && typeof previous.documents === 'object') session = previous;
-  for (const record of Object.values(session.documents)) record.picker = false;
-}).catch(() => { broadcastError('storage-failed'); });
+// Only preferences and authorization metadata survive a background restart.
+// Measurements remain in memory and are discarded when this coordinator changes.
+const loaded = Promise.all([
+  browser.storage.local.get(SETTINGS_KEY).then(local => { settings = validateSettings(local[SETTINGS_KEY]); }).catch(() => broadcastError('storage-failed')),
+  browser.storage.session.get(SESSION_KEY).then(async temporary => {
+    session = restoreAuthorizations(temporary[SESSION_KEY]);
+    // Overwrite legacy session payloads immediately; never retain their analysis.
+    if (temporary[SESSION_KEY] !== undefined) await browser.storage.session.set({ [SESSION_KEY]: boundedSession(session) });
+  }).catch(() => broadcastError('storage-failed')),
+]);
 
 function post(port: browser.runtime.Port, message: SidebarMessage) { try { port.postMessage(message); } catch { ports.delete(port); } }
 function broadcastError(code: string) { for (const port of ports.keys()) post(port, { type: 'error', code }); }
 function stateFor(windowId: number): SidebarState {
   let state = windows.get(windowId);
   if (!state) {
-    state = { windowId, tabId: null, documentToken: null, documentRevision: windowRevisions.get(windowId) ?? 0, access: 'needs-activation', selected: null, preview: null, picker: false, audit: null, progress: null, lastEvent: 'ready', settings: { ...settings } };
+    state = { windowId, tabId: null, documentToken: null, documentRevision: windowRevisions.get(windowId) ?? 0, access: 'needs-activation', selected: null, preview: null, picker: false, audit: null, previousAudit: null, progress: null, lastEvent: 'ready', settings: { ...settings } };
     windows.set(windowId, state);
   }
   return state;
@@ -44,15 +58,48 @@ function publish(windowId: number, event: StateEvent) {
   const state = stateFor(windowId); state.lastEvent = event; state.settings = { ...settings }; state.documentRevision = windowRevisions.get(windowId) ?? 0;
   for (const [port, owner] of ports) if (owner === windowId) post(port, { type: 'state', state });
 }
-function persist() {
-  const snapshot = boundedSession(session);
-  storageQueue = storageQueue.then(() => browser.storage.session.set({ [SESSION_KEY]: snapshot })).catch(() => { broadcastError('storage-failed'); });
+function boundAnalysis() {
+  const versions = new Map(Object.values(session.documents).map(record => [record, { expectedSelectionRequest: record.selectionRequest, expectedAuditRequest: record.audit?.id ?? '' }]));
+  const protectedRecord = (record: DocumentRecord) => record.picker || record.audit?.status === 'running'
+    || pendingAuditStarts.has(record) || Boolean(pendingSelections.get(record)?.size);
+  for (const record of analysisBudget.trim(session, MAX_ANALYSIS_BYTES, MAX_ANALYSIS_RECORDS, protectedRecord)) {
+    recordChanged(record);
+    if (!record.selected && !record.audit) {
+      releasedAnalysis.add(record);
+      const requestId = crypto.randomUUID();
+      record.selectionRequest = requestId; record.auditRequest = requestId; record.pendingContextSelection = false;
+      // A late cleanup must never erase a selection or scan that started later.
+      void send(record, 'release-analysis', requestId, versions.get(record)).catch(() => undefined);
+    }
+    const state = windows.get(record.windowId);
+    if (state?.tabId !== record.tabId || state.documentToken !== record.documentToken) continue;
+    state.selected = record.selected; state.audit = record.audit; state.previousAudit = record.previousAudit ?? null;
+    if (!record.selected && !record.audit) { state.preview = null; state.progress = null; }
+    publish(record.windowId, 'stale');
+  }
+}
+function persist(): Promise<void> {
+  boundAnalysis();
+  storageDirty = true;
+  if (!storageQueue) storageQueue = Promise.resolve().then(async () => {
+    try {
+      do {
+        storageDirty = false;
+        // Only the in-flight write owns a snapshot. Further requests mark one
+        // pending update, which reads the latest state after that write settles.
+        const snapshot = boundedSession(session);
+        try { await browser.storage.session.set({ [SESSION_KEY]: snapshot }); }
+        catch { broadcastError('storage-failed'); }
+      } while (storageDirty);
+    } catch { broadcastError('storage-failed'); }
+    finally { storageQueue = null; }
+  });
   return storageQueue;
 }
 function applyRecord(record: DocumentRecord, event: StateEvent) {
   const state = stateFor(record.windowId);
   if (state.tabId !== record.tabId) return;
-  Object.assign(state, { documentToken: record.documentToken, selected: record.selected, audit: record.audit, picker: record.picker, access: 'ready', progress: record.audit?.status === 'running' ? { scanned: record.audit.scanned, total: record.audit.total } : null });
+  Object.assign(state, { documentToken: record.documentToken, selected: record.selected, audit: record.audit, previousAudit: record.previousAudit ?? null, picker: record.picker, access: 'ready', progress: record.audit?.status === 'running' ? { scanned: record.audit.scanned, total: record.audit.total } : null });
   if (record.pendingContextSelection && record.selected) {
     event = 'selected'; state.selectionOrigin = 'context'; delete state.selectionTab;
     if ([...ports.values()].includes(record.windowId)) record.pendingContextSelection = false;
@@ -69,16 +116,23 @@ function syncMenu() {
 }
 class ContentOperationError extends Error {}
 function commandFor(record: DocumentRecord, type: ContentCommand['type'], requestId: string, extra: Partial<ContentCommand> = {}): ContentCommand {
-  return { channel: 'sil-content', type, requestId, epoch: session.epoch, windowId: record.windowId, tabId: record.tabId, documentToken: record.documentToken, settings, ...extra };
+  return { channel: 'sil-content', type, requestId, epoch: session.epoch, coordinatorToken, windowId: record.windowId, tabId: record.tabId, documentToken: record.documentToken, settings, ...extra };
 }
 async function send(record: DocumentRecord, type: ContentCommand['type'], requestId: string, extra: Partial<ContentCommand> = {}) {
-  const reply = await browser.tabs.sendMessage(record.tabId, commandFor(record, type, requestId, extra), { frameId: 0 });
-  if (reply?.error) throw new ContentOperationError(reply.error);
-  return reply;
+  const selection = ['select-node', 'capture-context', 'refresh-selection'].includes(type);
+  if (selection) {
+    if (!pendingSelections.has(record)) pendingSelections.set(record, new Set());
+    pendingSelections.get(record)!.add(requestId);
+  }
+  try {
+    const reply = await browser.tabs.sendMessage(record.tabId, commandFor(record, type, requestId, extra), { frameId: 0 });
+    if (reply?.error) throw new ContentOperationError(reply.error);
+    return reply;
+  } finally { if (selection) pendingSelections.get(record)?.delete(requestId); }
 }
 function clearVisible(windowId: number, tabId: number | null, access: SidebarState['access'], error?: string) {
   const state = stateFor(windowId);
-  Object.assign(state, { tabId, documentToken: null, access, selected: null, preview: null, picker: false, audit: null, progress: null, error });
+  Object.assign(state, { tabId, documentToken: null, access, selected: null, preview: null, picker: false, audit: null, previousAudit: null, progress: null, error });
 }
 async function attach(tab: browser.tabs.Tab, inject: boolean, requestId: string, event: StateEvent = 'activated') {
   const revision = windowRevisions.get(tab.windowId ?? -1) ?? 0;
@@ -113,7 +167,7 @@ async function attach(tab: browser.tabs.Tab, inject: boolean, requestId: string,
     if (!stillCurrent()) return null;
     beforeHello = session.documents[String(tabId)];
     analysisRevision = beforeHello ? recordRevisions.get(beforeHello) ?? 0 : 0;
-    const hello: ContentCommand = { channel: 'sil-content', type: 'hello', requestId, epoch: session.epoch, windowId, tabId, settings };
+    const hello: ContentCommand = { channel: 'sil-content', type: 'hello', requestId, epoch: session.epoch, coordinatorToken, windowId, tabId, settings };
     const result = await browser.tabs.sendMessage(tabId, hello, { frameId: 0 });
     if (!stillCurrent() || typeof result?.documentToken !== 'string') return null;
     const old = session.documents[String(tabId)];
@@ -123,12 +177,26 @@ async function attach(tab: browser.tabs.Tab, inject: boolean, requestId: string,
       // cannot replace a later selection, audit event or cancellation.
       return old!;
     }
+    if (same && (pendingSelections.get(old!)?.size || pendingAuditStarts.has(old!) || old!.picker)) {
+      // A cooperative capture keeps its preceding confirmed snapshot until it
+      // commits. A hello started after that capture intent therefore cannot use
+      // recordRevision alone: its otherwise current reply still describes the
+      // preceding request. Keep the coordinator's pending intent and let the
+      // selected/audit/cancelled event finish it. A new sidebar still receives
+      // the current visible record instead of waiting for the capture to finish.
+      applyRecord(old!, event);
+      return old!;
+    }
     const record: DocumentRecord = same ? old! : { windowId, tabId, documentToken: result.documentToken, touchedAt: Date.now(), selected: null, audit: null, selectionRequest: '', auditRequest: '', picker: false };
-    record.selected = 'selected' in result ? result.selected : same ? record.selected : null;
-    record.audit = 'audit' in result ? result.audit ? reassessAudit(result.audit, settings.contrastTarget) : null : same ? record.audit : null;
+    if (!releasedAnalysis.has(record)) {
+      record.selected = 'selected' in result ? result.selected : same ? record.selected : null;
+      record.audit = 'audit' in result ? result.audit ? reassessAudit(result.audit, settings.contrastTarget) : null : same ? record.audit : null;
+    }
     record.picker = Boolean(result.picker);
-    if (typeof result.selectionRequest === 'string') record.selectionRequest = result.selectionRequest;
-    if (typeof result.auditRequest === 'string') record.auditRequest = result.auditRequest;
+    if (!releasedAnalysis.has(record)) {
+      if (typeof result.selectionRequest === 'string') record.selectionRequest = result.selectionRequest;
+      if (typeof result.auditRequest === 'string') record.auditRequest = result.auditRequest;
+    }
     record.touchedAt = Date.now();
     recordChanged(record);
     session.documents[String(tabId)] = record;
@@ -243,7 +311,7 @@ async function activateAudit(windowId: number, command: Extract<SidebarCommand, 
 function validatedEvent(message: unknown, sender: browser.runtime.MessageSender): ContentEvent | null {
   if (sender.id !== browser.runtime.id || sender.tab?.id === undefined || sender.tab.windowId === undefined || sender.frameId !== 0 || !message || typeof message !== 'object') return null;
   const event = message as ContentEvent;
-  if (event.channel !== 'sil-event' || typeof event.requestId !== 'string' || event.epoch !== session.epoch) return null;
+  if (event.channel !== 'sil-event' || typeof event.requestId !== 'string' || event.epoch !== session.epoch || event.coordinatorToken !== coordinatorToken) return null;
   if (!['selected', 'preview', 'picker-cancelled', 'audit', 'stale', 'unloaded', 'removed'].includes(event.type)) return null;
   const record = session.documents[String(sender.tab.id)];
   if (!identityMatches(record, sender.tab.windowId, sender.tab.id, event.documentToken)) return null;
@@ -255,6 +323,27 @@ function validatedEvent(message: unknown, sender: browser.runtime.MessageSender)
 }
 function currentSnapshot(snapshot: Snapshot | undefined): Snapshot | null {
   return snapshot ? { ...snapshot, textRuns: snapshot.textRuns.map(run => evaluateRun(run, settings.contrastTarget)) } : null;
+}
+
+function acceptAuditStart(record: DocumentRecord, requestId: string): boolean {
+  if (pendingAuditStarts.get(record)?.requestId !== requestId) return false;
+  pendingAuditStarts.delete(record);
+  if (record.audit?.status === 'complete') record.previousAudit = record.audit;
+  const unchangedSelection = record.selectionRequest === requestId;
+  record.audit = null;
+  if (unchangedSelection) { record.selected = null; record.picker = false; record.pendingContextSelection = false; }
+  const state = windows.get(record.windowId);
+  if (state?.tabId === record.tabId && state.documentToken === record.documentToken) {
+    if (unchangedSelection) {
+      state.selected = null; state.preview = null; state.picker = false;
+      delete state.selectionTab; delete state.selectionOrigin;
+    }
+    state.audit = null;
+    state.previousAudit = record.previousAudit ?? null; state.progress = null;
+    delete state.error;
+    publish(record.windowId, 'audit-reset');
+  }
+  return true;
 }
 
 browser.runtime.onMessage.addListener((message: unknown, sender) => {
@@ -271,6 +360,7 @@ browser.runtime.onMessage.addListener((message: unknown, sender) => {
     }
     if (['selected', 'preview', 'picker-cancelled', 'removed', 'stale'].includes(event.type) && event.requestId !== record.selectionRequest) return { ignored: true };
     if (event.type === 'audit' && event.requestId !== record.auditRequest) return { ignored: true };
+    if (event.type === 'selected' || event.type === 'audit') releasedAnalysis.delete(record);
     recordChanged(record);
     switch (event.type) {
       case 'selected': record.selected = currentSnapshot(event.snapshot); record.picker = false; if (state.tabId === record.tabId) state.preview = null; break;
@@ -278,25 +368,45 @@ browser.runtime.onMessage.addListener((message: unknown, sender) => {
       case 'picker-cancelled': record.picker = false; record.selected = currentSnapshot(event.snapshot); if (state.tabId === record.tabId) state.preview = null; break;
       case 'removed': record.selected = null; if (state.tabId === record.tabId) { state.preview = null; state.error = 'element-removed'; } break;
       case 'stale': if (record.selected) record.selected.stale = true; break;
-      case 'audit': record.audit = event.audit ? reassessAudit(event.audit, settings.contrastTarget) : null; break;
+      case 'audit':
+        acceptAuditStart(record, event.requestId);
+        record.audit = event.audit ? reassessAudit(event.audit, settings.contrastTarget) : null; break;
     }
     record.touchedAt = Date.now();
+    boundAnalysis();
     applyRecord(record, event.type === 'removed' ? 'stale' : event.type);
-    void persist(); return { ok: true };
+    // Progress is live state. Only authorization metadata is serialized.
+    if (event.type !== 'audit' || record.audit?.status !== 'running') void persist();
+    return { ok: true };
   });
 });
 
 function applySettings(next: Settings) {
+  // storage.onChanged may report our own write before its promise settles.
+  // Applying identical preferences again must not repeat analysis or messages.
+  if (JSON.stringify(next) === JSON.stringify(settings)) return;
+  const contrastChanged = settings.contrastTarget !== next.contrastTarget;
+  const menuChanged = settings.contextMenuEnabled !== next.contextMenuEnabled;
   settings = next;
   for (const record of Object.values(session.documents)) {
     recordChanged(record);
-    if (record.audit) record.audit = reassessAudit(record.audit, next.contrastTarget);
-    if (record.selected) record.selected.textRuns = record.selected.textRuns.map(run => evaluateRun(run, next.contrastTarget));
+    if (contrastChanged) {
+      if (record.audit) record.audit = reassessAudit(record.audit, next.contrastTarget);
+      if (record.previousAudit) record.previousAudit = reassessAudit(record.previousAudit, next.contrastTarget);
+      if (record.selected) record.selected.textRuns = record.selected.textRuns.map(run => evaluateRun(run, next.contrastTarget));
+    }
     void send(record, 'settings', crypto.randomUUID()).catch(() => undefined);
-    applyRecord(record, 'settings');
   }
-  for (const [windowId, state] of windows) { state.preview = currentSnapshot(state.preview ?? undefined); publish(windowId, 'settings'); }
-  syncMenu(); void persist();
+  for (const [windowId, state] of windows) {
+    if (contrastChanged) state.preview = currentSnapshot(state.preview ?? undefined);
+    const record = state.tabId === null ? undefined : session.documents[String(state.tabId)];
+    if (record && identityMatches(record, windowId, state.tabId!, state.documentToken!)) applyRecord(record, 'settings');
+    else publish(windowId, 'settings');
+  }
+  if (menuChanged) syncMenu();
+  // Display and control preferences are stored separately in storage.local.
+  // Only changing the contrast target changes the retained analysis payloads.
+  if (contrastChanged) void persist();
 }
 function updateSettings(patch: Partial<Settings>, reset = false) {
   const operation = settingsQueue.then(async () => {
@@ -315,16 +425,69 @@ async function clearData() {
   for (const windowId of windows.keys()) windowRevisions.set(windowId, (windowRevisions.get(windowId) ?? 0) + 1);
   const records = Object.values(session.documents);
   for (const record of records) {
-    record.selected = null; record.audit = null; record.picker = false; record.selectionRequest = ''; record.auditRequest = ''; record.pendingContextSelection = false;
+    pendingAuditStarts.delete(record);
+    record.selected = null; record.audit = null; record.previousAudit = null; record.picker = false; record.selectionRequest = ''; record.auditRequest = ''; record.pendingContextSelection = false;
   }
   for (const windowId of windows.keys()) {
     const state = stateFor(windowId);
-    state.selected = null; state.preview = null; state.picker = false; state.audit = null; state.progress = null;
+    state.selected = null; state.preview = null; state.picker = false; state.audit = null; state.previousAudit = null; state.progress = null;
     publish(windowId, 'data-cleared');
   }
   const cleanup = Promise.allSettled(records.map(record => send(record, 'clear-data', crypto.randomUUID())));
   await persist();
   await cleanup;
+}
+
+async function listAnalyses(port: browser.runtime.Port, requestId: string) {
+  analysisListRequests.set(port, requestId);
+  const retained = () => Object.values(session.documents).filter(record => record.selected || record.audit || record.previousAudit)
+    .sort((a, b) => b.touchedAt - a.touchedAt || b.tabId - a.tabId);
+  const titles = new Map<DocumentRecord, string>();
+  await Promise.all(retained().map(async record => {
+    try {
+      // Titles are live labels for the explicit overview, never stored with analysis.
+      const tab = await browser.tabs.get(record.tabId);
+      if (tab.windowId === record.windowId && typeof tab.title === 'string') {
+        const title = tab.title.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 160);
+        if (title) titles.set(record, title);
+      }
+    } catch { /* Tabs may close, or their title may be unavailable without access. */ }
+  }));
+  if (!connectedPorts.has(port) || analysisListRequests.get(port) !== requestId) return;
+  // Read current records after asynchronous browser lookups. A cleared or navigated
+  // tab must never reappear from the snapshot used to obtain its optional title.
+  const entries = retained().map(record => ({
+    tabId: record.tabId, windowId: record.windowId, documentToken: record.documentToken,
+    touchedAt: record.touchedAt, estimatedBytes: analysisBudget.estimate(record),
+    selected: Boolean(record.selected), auditStatus: record.audit?.status ?? null,
+    auditRuns: record.audit?.runs.length ?? 0, previousAudit: Boolean(record.previousAudit),
+    measuredAt: record.audit?.measuredAt ?? record.selected?.measuredAt ?? record.previousAudit?.measuredAt ?? null,
+    ...(titles.has(record) ? { title: titles.get(record)! } : {}),
+  }));
+  post(port, { type: 'analyses', requestId, entries, maximumBytes: MAX_ANALYSIS_BYTES, maximumRecords: MAX_ANALYSIS_RECORDS });
+}
+
+async function clearTabAnalysis(port: browser.runtime.Port, command: Extract<SidebarCommand, { type: 'clear-tab-analysis' }>) {
+  const record = session.documents[String(command.targetTabId)];
+  if (!record || record.documentToken !== command.documentToken) throw new Error('page-changed');
+  analysisListRequests.set(port, command.requestId);
+  // Independent request generations retire work for this tab only. The global
+  // epoch would also invalidate unrelated scans in other tabs and windows.
+  attempts.delete(record.tabId); contextRequests.delete(record.tabId); activationJobs.delete(record.tabId);
+  pendingAuditStarts.delete(record); recordChanged(record);
+  record.selected = null; record.audit = null; record.previousAudit = null; record.picker = false;
+  record.selectionRequest = command.requestId; record.auditRequest = command.requestId; record.pendingContextSelection = false;
+  const state = windows.get(record.windowId);
+  if (state?.tabId === record.tabId && state.documentToken === record.documentToken) {
+    windowRevisions.set(record.windowId, (windowRevisions.get(record.windowId) ?? 0) + 1);
+    state.selected = null; state.preview = null; state.audit = null; state.previousAudit = null; state.picker = false; state.progress = null;
+    delete state.selectionTab; delete state.selectionOrigin; delete state.error;
+    publish(record.windowId, 'data-cleared');
+  }
+  const cleanup = send(record, 'clear-data', command.requestId).catch(() => undefined);
+  await persist();
+  await cleanup;
+  if (analysisListRequests.get(port) === command.requestId) return listAnalyses(port, command.requestId);
 }
 
 async function saveExport(command: Extract<SidebarCommand, { type: 'save-export' }>, windowId: number) {
@@ -400,11 +563,49 @@ browser.permissions.onRemoved.addListener(removed => {
   });
 });
 
+async function diagnoseNode(port: browser.runtime.Port, command: Extract<SidebarCommand, { type: 'diagnose-node' }>, record: DocumentRecord, state: SidebarState) {
+  if (!settings.showDiagnostics) return;
+  const revision = windowRevisions.get(record.windowId) ?? 0, analysisRevision = recordRevisions.get(record) ?? 0, epoch = session.epoch;
+  if (command.expectedTabId !== record.tabId || command.expectedDocumentToken !== record.documentToken || command.expectedRevision !== revision
+    || record.picker || record.audit?.status === 'running') throw new Error('page-changed');
+  const source = command.source.kind === 'audit' ? record.audit : record.selected;
+  const runs = source && ('runs' in source ? source.runs : source.textRuns);
+  const runIndex = runs?.findIndex(run => run.id === command.runId && run.elementRef === command.referenceId) ?? -1;
+  if (!source || source.id !== command.source.id || !runs || runIndex < 0) throw new Error('target-expired');
+  const measurement = diagnosticMeasurement(runs[runIndex], command.source.kind, source.measuredAt, source.stale, runIndex + 1, source.viewport, source.reasons);
+  diagnosticRequests.set(port, command.requestId);
+  const current = () => settings.showDiagnostics && ports.get(port) === record.windowId && diagnosticRequests.get(port) === command.requestId
+    && session.epoch === epoch && session.documents[String(record.tabId)] === record && state.tabId === record.tabId && state.documentToken === record.documentToken
+    && (windowRevisions.get(record.windowId) ?? 0) === revision && (recordRevisions.get(record) ?? 0) === analysisRevision
+    && !record.picker && record.audit?.status !== 'running';
+  try {
+    const [tab] = await browser.tabs.query({ windowId: record.windowId, active: true });
+    if (!current()) return;
+    if (tab?.id !== record.tabId || tab.windowId !== record.windowId) throw new Error('page-changed');
+    const reply = await send(record, 'diagnose-node', command.requestId, { diagnosticTarget: { referenceId: command.referenceId, runId: command.runId, source: command.source } });
+    if (!current()) return;
+    if (reply.documentToken !== record.documentToken || !reply.report) throw new Error('page-changed');
+    const report = sanitizeDiagnostic(reply.report as DiagnosticReport);
+    report.measurement = measurement;
+    report.generator.version = diagnosticVersion(browser.runtime.getManifest().version);
+    try {
+      const info = await browser.runtime.getBrowserInfo();
+      report.browser = { name: info.name === 'Firefox' ? 'Firefox' : 'unknown', version: diagnosticVersion(info.version) };
+    } catch { /* Browser identification is optional and contains no user agent. */ }
+    if (current()) post(port, { type: 'diagnostic', requestId: command.requestId, report });
+  } catch (error) {
+    if (!current()) return;
+    throw error instanceof ContentOperationError ? error : new Error('measurement-failed');
+  }
+}
+
 async function handleCommand(port: browser.runtime.Port, command: SidebarCommand) {
   await loaded;
+  if (!connectedPorts.has(port)) return;
   if (command.type === 'ready') {
     if (!Number.isSafeInteger(command.windowId)) throw new Error('invalid-message');
     await browser.windows.get(command.windowId);
+    if (!connectedPorts.has(port)) return;
     ports.set(port, command.windowId);
     await refreshWindow(command.windowId, 'ready');
     return;
@@ -412,6 +613,8 @@ async function handleCommand(port: browser.runtime.Port, command: SidebarCommand
   const windowId = ports.get(port);
   if (windowId === undefined) throw new Error('invalid-message');
   if (command.type === 'clear-data') return clearData();
+  if (command.type === 'list-analyses') return listAnalyses(port, command.requestId);
+  if (command.type === 'clear-tab-analysis') return clearTabAnalysis(port, command);
   if (command.type === 'reset-settings') return updateSettings({}, true);
   if (command.type === 'update-settings') return updateSettings(command.settings);
   if (command.type === 'save-export') return saveExport(command, windowId);
@@ -420,6 +623,7 @@ async function handleCommand(port: browser.runtime.Port, command: SidebarCommand
     : state.tabId === null ? undefined : session.documents[String(state.tabId)];
   if (command.type === 'start-audit' && !record) return;
   if (state.access !== 'ready' || !record || record.documentToken !== state.documentToken) throw new Error('activation-required');
+  if (command.type === 'diagnose-node') return diagnoseNode(port, command, record, state);
   if (['start-picker', 'cancel-picker', 'refresh-selection', 'select-node'].includes(command.type)) {
     // A newer explicit selection intent retires an unfinished context capture,
     // including its late failure. It must not take control back from the user.
@@ -435,16 +639,12 @@ async function handleCommand(port: browser.runtime.Port, command: SidebarCommand
   if (command.type === 'start-picker') record.picker = true;
   if (command.type === 'cancel-picker') { record.picker = false; state.preview = null; }
   if (command.type === 'start-audit') {
-    // A new scan is a fresh analysis of this document only. Retire outstanding
-    // captures/replies before dispatching work so old results cannot return.
+    // Reserve request identities immediately, but preserve the last results until
+    // content validates the scope and accepts the scan. A removed section should
+    // report its error without erasing an otherwise useful completed audit.
     attempts.delete(record.tabId); contextRequests.delete(record.tabId); activationJobs.delete(record.tabId);
-    record.selected = null; record.audit = null; record.picker = false;
-    record.pendingContextSelection = false;
+    pendingAuditStarts.set(record, { requestId: command.requestId, selectionRequest: record.selectionRequest, auditRequest: record.auditRequest });
     record.selectionRequest = command.requestId; record.auditRequest = command.requestId;
-    state.selected = null; state.preview = null; state.picker = false; state.audit = null; state.progress = null;
-    delete state.selectionTab; delete state.selectionOrigin; delete state.error;
-    publish(windowId, 'audit-reset');
-    void persist();
   }
   if (command.type === 'select-node') state.selectionTab = command.tab ?? 'contrast';
   const revision = windowRevisions.get(windowId) ?? 0;
@@ -455,14 +655,31 @@ async function handleCommand(port: browser.runtime.Port, command: SidebarCommand
     // when the document stays unchanged. Cancellation keeps its request ID.
     && record.selectionRequest === selectionRequest && record.auditRequest === auditRequest;
   try {
-    await send(record, command.type, command.requestId, 'referenceId' in command ? { referenceId: command.referenceId } : {});
+    await send(record, command.type, command.requestId, command.type === 'start-audit'
+      ? { scope: command.scope, referenceId: command.referenceId }
+      : 'referenceId' in command ? { referenceId: command.referenceId } : {});
     if (!stillCurrent()) return;
+    if (command.type === 'start-audit') acceptAuditStart(record, command.requestId);
     applyRecord(record, command.type === 'cancel-picker' ? 'picker-cancelled' : 'activated');
-    void persist();
+    if (command.type !== 'show-node') void persist();
   } catch (error) {
-    if (!stillCurrent()) return;
+    const current = stillCurrent();
+    const pending = pendingAuditStarts.get(record);
+    const rejectedStart = command.type === 'start-audit' && pending?.requestId === command.requestId
+      && session.documents[String(record.tabId)] === record && record.auditRequest === command.requestId;
+    if (rejectedStart) {
+      pendingAuditStarts.delete(record);
+      if (record.selectionRequest === command.requestId) record.selectionRequest = pending!.selectionRequest;
+      record.auditRequest = pending!.auditRequest;
+    }
+    if (!current) {
+      // A newer selection may supersede the operation's UI state, but its caller
+      // still needs a terminal reply to release the pending audit-start control.
+      if (rejectedStart) throw error;
+      return;
+    }
     recordChanged(record);
-    record.picker = false; state.preview = null;
+    if (!rejectedStart || !(error instanceof ContentOperationError)) { record.picker = false; state.preview = null; }
     // A connected content script can reject one expired/unsupported operation
     // without losing page access. Only transport failures require activation.
     if (!(error instanceof ContentOperationError)) state.access = 'needs-activation';
@@ -472,16 +689,18 @@ async function handleCommand(port: browser.runtime.Port, command: SidebarCommand
 
 browser.runtime.onConnect.addListener(port => {
   if (port.name !== 'sidebar' || port.sender?.id !== browser.runtime.id || port.sender.url !== browser.runtime.getURL('sidebar/index.html')) return;
+  connectedPorts.add(port);
   port.onMessage.addListener((value: unknown) => {
     if (!isSidebarCommand(value)) { post(port, { type: 'error', code: 'invalid-message' }); return; }
     void handleCommand(port, value).catch(error => post(port, { type: 'error', requestId: value.requestId, code: error instanceof Error ? error.message : 'operation-failed' }));
   });
   port.onDisconnect.addListener(() => {
+    connectedPorts.delete(port);
     const windowId = ports.get(port); ports.delete(port);
     if (windowId === undefined || [...ports.values()].includes(windowId)) return;
     const state = stateFor(windowId);
     const record = state.tabId === null ? undefined : session.documents[String(state.tabId)];
-    if (record) { recordChanged(record); record.picker = false; void send(record, 'cancel-picker', crypto.randomUUID()).catch(() => undefined); void persist(); }
+    if (record) { const changed = record.picker; recordChanged(record); record.picker = false; void send(record, 'cancel-picker', crypto.randomUUID()).catch(() => undefined); if (changed) void persist(); }
     state.preview = null; state.picker = false;
   });
 });
@@ -509,7 +728,7 @@ browser.tabs.onUpdated.addListener((tabId, changes, tab) => {
     delete session.documents[String(tabId)]; attempts.delete(tabId);
     const state = windows.get(windowId);
     if (state?.tabId === tabId) { clearVisible(windowId, tabId, 'needs-activation'); publish(windowId, 'document-changed'); }
-    void persist();
+    if (record) void persist();
   });
 });
 browser.tabs.onRemoved.addListener(tabId => {
@@ -518,12 +737,12 @@ browser.tabs.onRemoved.addListener(tabId => {
     windowRevisions.set(windowId, (windowRevisions.get(windowId) ?? 0) + 1);
     clearVisible(windowId, null, 'needs-activation'); publish(windowId, 'document-changed');
   }
-  void loaded.then(() => { delete session.documents[String(tabId)]; void persist(); });
+  void loaded.then(() => { if (session.documents[String(tabId)]) { delete session.documents[String(tabId)]; void persist(); } });
 });
 browser.windows.onRemoved.addListener(windowId => {
   windowRevisions.set(windowId, (windowRevisions.get(windowId) ?? 0) + 1);
   for (const [port, owner] of ports) if (owner === windowId) ports.delete(port);
-  void loaded.then(() => { windows.delete(windowId); for (const record of Object.values(session.documents)) if (record.windowId === windowId) { delete session.documents[String(record.tabId)]; attempts.delete(record.tabId); contextRequests.delete(record.tabId); activationJobs.delete(record.tabId); } void persist(); });
+  void loaded.then(() => { windows.delete(windowId); let changed = false; for (const record of Object.values(session.documents)) if (record.windowId === windowId) { delete session.documents[String(record.tabId)]; changed = true; attempts.delete(record.tabId); contextRequests.delete(record.tabId); activationJobs.delete(record.tabId); } if (changed) void persist(); });
 });
 browser.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !changes[SETTINGS_KEY]) return;

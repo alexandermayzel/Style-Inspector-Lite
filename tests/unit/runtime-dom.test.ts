@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { directTextCount, ElementRegistry, measureRuns, measureSnapshot, registerOwnElement, type TextRunGeometry } from '../../src/runtime/dom';
+import { directTextCount, ElementRegistry, iterateDirectText, iterateMeasuredRuns, iterateMeasurementSteps, measureRuns, measureSnapshot, registerOwnElement, withMeasurementBatch, type TextRunGeometry } from '../../src/runtime/dom';
 import { DEFAULT_SETTINGS } from '../../src/runtime/settings';
 import { contrastRatio, cssColorContrast } from '../../src/core/contrast';
 
@@ -20,6 +20,52 @@ class PaintedElement {
   contains(element: PaintedElement) { for (let current: PaintedElement | null = element; current; current = current.parentElement) if (current === this) return true; return false; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 20, height: 20 }; }
 }
+
+test('deep paint ancestry yields before a run is emitted and preserves all ancestor effects', () => {
+  let target = new PaintedElement(style({ opacity: '.5' }));
+  for (let depth = 0; depth < 32; depth++) target = new PaintedElement(style(), target);
+  let reads = 0;
+  const replacements = {
+    getComputedStyle: (node: PaintedElement, pseudo?: string) => { reads++; return pseudo ? node.pseudo : node.computed; },
+    SVGElement: class {}, innerWidth: 1280, innerHeight: 800, document: { elementsFromPoint: () => [target] },
+  };
+  const previous = new Map(Object.keys(replacements).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(replacements)) Object.defineProperty(globalThis, key, { value, configurable: true });
+  try {
+    const registry = new ElementRegistry('cooperative-paint');
+    const iterator = iterateMeasurementSteps(target as unknown as Element, registry, DEFAULT_SETTINGS, 1);
+    const first = withMeasurementBatch(() => iterator.next());
+    assert.equal(first.done, false); assert.equal(first.value, null);
+    assert.ok(reads <= 26, `The first chunk must not inspect all 33 ancestors (${reads} style reads)`);
+    const rest = [...iterator], runs = rest.filter(step => step !== null);
+    assert.ok(rest.filter(step => step === null).length >= 3);
+    assert.equal(runs.length, 1); assert.equal(runs[0]!.contrast.status, 'manual');
+    assert.ok(runs[0]!.reasons.includes('group-opacity'), 'The last ancestor still affects the measured run');
+    assert.deepEqual(runs, measureRuns(target as unknown as Element, registry, DEFAULT_SETTINGS, 1));
+  } finally {
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});
+
+test('excluded markup containers never read their script or style payload as text candidates', () => {
+  let reads = 0;
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'Node');
+  Object.defineProperty(globalThis, 'Node', { value: { TEXT_NODE: 3 }, configurable: true });
+  try {
+    for (const tagName of ['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'HEAD']) {
+      const element = {
+        tagName, closest: () => null,
+        childNodes: [{ nodeType: 3, get nodeValue() { reads++; return 'Excluded source content'; } }],
+      } as unknown as Element;
+      assert.equal(directTextCount(element), 0);
+    }
+    assert.equal(reads, 0, 'Excluded payloads must not incur content reads before the visibility check');
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'Node', previous); else Reflect.deleteProperty(globalThis, 'Node');
+  }
+});
 
 test('offscreen pointer-transparent text uses an enclosing opaque background only in undisplaced flow', () => {
   const ordinary = {
@@ -160,6 +206,9 @@ test('simple gradient bounds survive layering while unsupported paint stays unce
     deep.computed.backgroundImage = 'linear-gradient(white, #eee)';
     assert.equal(measureDeep().contrast.status, 'manual');
     assert.equal(measureDeep().backgroundRange, undefined);
+    for (let index = 0; index < 220; index++) deep = new PaintedElement(style({ backgroundColor: 'transparent' }), deep);
+    assert.equal(measureDeep().contrast.status, 'manual', 'Unvisited paint beyond the total ancestry budget is never certified');
+    assert.ok(measureDeep().reasons.includes('measurement-complexity-limit'));
   } finally {
     for (const [key, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -416,6 +465,20 @@ test('overlap checks and run identity follow actual text nodes across sibling in
     assert.equal(measure()[0]!.contrast.status, 'pass');
     assert.deepEqual(samples, [], 'Normal offscreen text never probes an unrelated point inside the viewport');
 
+    stackAt = () => [neighbour, element, parent];
+    for (const edge of [
+      { left: 90, top: 0, width: 3000, height: 10 },
+      { left: -2900, top: 0, width: 3000, height: 10 },
+      { left: 90, top: -90, width: 12, height: 100 },
+      { left: 90, top: 790, width: 12, height: 100 },
+    ]) {
+      child.rects = [edge];
+      assert.ok(measure()[0]!.reasons.includes('overlapping-element'), 'Partly visible text must still check the overlapping paint when its full center is offscreen');
+      assert.equal(samples.length, 1);
+      assert.ok(samples[0]! >= 0 && samples[0]! < 800, 'The hit-test point is inside the viewport');
+      assert.deepEqual(child.rects, [edge], 'Viewport sampling does not alter text fragment bounds');
+    }
+
     element.tagName = 'INPUT';
     Object.assign(element, { getAttribute: () => null });
     stackAt = () => [neighbour, element, parent];
@@ -425,6 +488,97 @@ test('overlap checks and run identity follow actual text nodes across sibling in
     for (const [key, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
       else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});
+
+test('viewport fragment omissions are recorded per run without altering full-element geometry', () => {
+  const element = new PaintedElement(style({ display: 'block' }));
+  const child = { nodeType: 3, nodeValue: 'Visible and offscreen lines' };
+  let rects = [{ left: 10, top: 10, width: 100, height: 20 }, { left: 10, top: 1000, width: 100, height: 20 }];
+  Object.assign(element, { childNodes: [child], closest: () => null, getClientRects: () => rects });
+  const replacements = {
+    getComputedStyle: (node: PaintedElement, pseudo?: string) => pseudo ? node.pseudo : node.computed,
+    SVGElement: class {}, Node: { TEXT_NODE: 3 }, innerWidth: 1280, innerHeight: 800,
+    document: { createRange: () => ({ selectNodeContents() {}, getClientRects: () => rects }), elementsFromPoint: () => [element] },
+  };
+  const previous = new Map(Object.keys(replacements).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(replacements)) Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  try {
+    const registry = new ElementRegistry('viewport-fragments');
+    const measure = (within?: { width: number; height: number }) => {
+      const geometry: TextRunGeometry[] = [];
+      const count = directTextCount(element as unknown as Element, 10, geometry, false, within);
+      return { geometry, runs: measureRuns(element as unknown as Element, registry, DEFAULT_SETTINGS, count, geometry) };
+    };
+    const scoped = measure({ width: 1280, height: 800 });
+    assert.equal(scoped.geometry[0]!.rects.length, 1); assert.equal(scoped.geometry[0]!.viewportPartial, true);
+    assert.equal(scoped.runs[0]!.viewportPartial, true);
+    const full = measure();
+    assert.equal(full.geometry[0]!.rects.length, 2); assert.equal(full.runs[0]!.viewportPartial, undefined);
+    assert.equal(full.runs[0]!.id, scoped.runs[0]!.id, 'Partial geometry does not invent a different Text identity');
+    rects[1]!.width = 0;
+    assert.equal(measure({ width: 1280, height: 800 }).runs[0]!.viewportPartial, undefined, 'Zero-width helper fragments are not omitted painted text');
+    rects = [{ left: 10, top: 1000, width: 100, height: 20 }];
+    assert.equal(measure({ width: 1280, height: 800 }).runs.length, 0, 'Entirely offscreen text remains outside the viewport audit');
+  } finally {
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});
+
+test('incremental text collection and painting preserve synchronous geometry, identities and viewport filtering', () => {
+  const element = new PaintedElement(style({ display: 'block' }));
+  const children = Array.from({ length: 300 }, (_, index) => ({ nodeType: 3, nodeValue: 'Synthetic text', rects: [
+    { left: 10, top: index % 2 ? 1000 : 10, width: 100, height: 20 },
+  ] }));
+  Object.assign(element, { childNodes: children, closest: () => null, getClientRects: () => children[0]!.rects });
+  let ranges = 0;
+  const replacements = {
+    getComputedStyle: (node: PaintedElement, pseudo?: string) => pseudo ? node.pseudo : node.computed,
+    SVGElement: class {}, Node: { TEXT_NODE: 3 }, innerWidth: 1280, innerHeight: 800,
+    document: { createRange: () => { let child: typeof children[number]; ranges++; return { selectNodeContents(node: typeof child) { child = node; }, getClientRects: () => child.rects }; }, elementsFromPoint: () => [element] },
+  };
+  const previous = new Map(Object.keys(replacements).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(replacements)) Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  try {
+    const target = element as unknown as Element, registry = new ElementRegistry('incremental-text');
+    const partial = iterateDirectText(target, 1000);
+    assert.equal(ranges, 0, 'Creating the iterator does not eagerly inspect the element');
+    assert.equal(partial.next().done, false); assert.equal(ranges, 1);
+    partial.return(undefined); assert.equal(ranges, 1, 'Closing an incomplete collection performs no remaining range reads');
+    for (const within of [undefined, { width: 1280, height: 800 }]) {
+      const syncGeometry: TextRunGeometry[] = [];
+      const count = directTextCount(target, 200, syncGeometry, false, within);
+      const syncRuns = withMeasurementBatch(() => measureRuns(target, registry, DEFAULT_SETTINGS, count, syncGeometry));
+      const geometry: TextRunGeometry[] = [];
+      for (const item of iterateDirectText(target, 200, false, within)) if (item && item !== 'control') geometry.push(item);
+      assert.deepEqual(geometry, syncGeometry);
+      const runs = [], iterator = iterateMeasuredRuns(target, registry, DEFAULT_SETTINGS, count, geometry);
+      for (;;) {
+        const item = withMeasurementBatch(() => iterator.next());
+        if (item.done) break;
+        runs.push(item.value);
+      }
+      assert.deepEqual(runs, syncRuns, 'Yield boundaries do not change measurement results or stable Text identities');
+      assert.equal(runs.length, within ? 150 : 200);
+    }
+    Object.assign(element, { childNodes: Array.from({ length: 1000 }, () => ({ nodeType: 8 })) });
+    const blank = iterateDirectText(target);
+    for (let i = 0; i < 10; i++) assert.deepEqual(blank.next(), { value: null, done: false });
+    blank.return(undefined);
+    const growingChildren = Array.from({ length: 10 }, () => ({ nodeType: 8 }));
+    Object.assign(element, { childNodes: growingChildren });
+    const growing = iterateDirectText(target);
+    for (let i = 0; i < 10; i++) {
+      assert.deepEqual(growing.next(), { value: null, done: false });
+      growingChildren.push({ nodeType: 8 });
+    }
+    assert.equal(growing.next().done, true, 'Appending nontext children during each pause cannot keep one element collection alive indefinitely');
+  } finally {
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key);
     }
   }
 });
@@ -630,8 +784,8 @@ test('fully clipped accessible labels and their descendants are excluded without
 test('shown input placeholders use their own color, opacity and font without reading form text', () => {
   const previous = new Map<string, PropertyDescriptor | undefined>();
   let shown = true, emptyPlaceholder = false, disabled = false, type = 'search';
-  const placeholder = style({ color: 'rgba(160, 160, 160, 0.8)', backgroundColor: 'transparent', opacity: '0.5', fontSize: '24px', fontWeight: '700', display: 'inline', visibility: 'visible' });
-  const input = Object.assign(new PaintedElement(style({ color: 'white', backgroundColor: 'black', display: 'inline-block', visibility: 'visible' })), {
+  const placeholder = style({ color: 'rgba(160, 160, 160, 0.8)', backgroundColor: 'transparent', opacity: '0.5', fontSize: '24px', fontWeight: '700', fontFamily: 'Georgia, serif', lineHeight: 'normal', display: 'inline', visibility: 'visible' });
+  const input = Object.assign(new PaintedElement(style({ color: 'white', backgroundColor: 'black', fontFamily: 'Arial, sans-serif', lineHeight: '24px', display: 'inline-block', visibility: 'visible' })), {
     tagName: 'INPUT', localName: 'input', closest: () => null,
     getClientRects: () => [{ width: 200, height: 40 }],
     matches: (selector: string) => selector === ':placeholder-shown' ? shown : selector === '[placeholder=""]' ? emptyPlaceholder : selector === ':disabled' && disabled,
@@ -657,6 +811,8 @@ test('shown input placeholders use their own color, opacity and font without rea
     assert.deepEqual(run.foreground.rgba, { r: 160, g: 160, b: 160, a: 0.4 });
     assert.equal(run.fontSizeCssPx, 24);
     assert.equal(run.fontWeight, 700);
+    assert.equal(run.fontFamily, 'Georgia, serif');
+    assert.equal(run.lineHeight, 'normal', 'Computed normal is not replaced with an invented pixel height');
     assert.equal(run.contrast.category, 'large');
     assert.equal(run.contrast.ratio, contrastRatio(run.foreground.rgba!, { r: 0, g: 0, b: 0, a: 1 }));
     assert.equal(run.contrast.status, 'fail', 'Placeholder opacity changes the contrast even though the input color is white');

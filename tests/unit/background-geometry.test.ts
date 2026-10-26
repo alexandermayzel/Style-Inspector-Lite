@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { negativeBackground, opaqueAncestorCoversText, siblingControlCssBackground, singleSiblingInput } from '../../src/runtime/background-geometry';
+import { enclosingCssBackground, negativeBackground, opaqueAncestorCoversText, siblingControlCssBackground, singleSiblingInput } from '../../src/runtime/background-geometry';
 import { ElementRegistry, measureRuns, type TextRunGeometry } from '../../src/runtime/dom';
 import { DEFAULT_SETTINGS } from '../../src/runtime/settings';
 import { cssColorContrast } from '../../src/core/contrast';
@@ -56,6 +56,123 @@ function opaqueFixture() {
 }
 const covers = (f: ReturnType<typeof opaqueFixture>, bounds = rect, budget?: { remaining: number; limited: boolean }) =>
   opaqueAncestorCoversText(f.hint as unknown as Element, f.frame as unknown as Element, bounds, budget);
+
+const enclosing = (f: ReturnType<typeof opaqueFixture>, bounds = rect) => enclosingCssBackground(f.hint as unknown as Element, bounds);
+
+test('displaced text retains only an explicitly covering opaque CSS ancestor color without content reads', () => environment(() => {
+  const f = opaqueFixture();
+  Object.assign(f.wrapper.css, { marginLeft: '-8px', left: '12px', position: 'relative' });
+  f.hint.css.transform = 'matrix(1, 0, 0, 1, 5, 0)';
+  for (const node of [f.outer, f.frame, f.wrapper, f.hint]) for (const name of ['value', 'textContent', 'innerText', 'nodeValue', 'childNodes']) {
+    Object.defineProperty(node, name, { get() { throw Error(`Content must not be read: ${name}`); } });
+  }
+  assert.deepEqual(enclosing(f), { r: 36, g: 38, b: 38, a: 1 });
+  f.frame.css.borderTopLeftRadius = '10px';
+  assert.deepEqual(enclosing(f), { r: 36, g: 38, b: 38, a: 1 });
+  assert.equal(enclosing(f, { ...rect, top: 9 }), null, 'The whole fragment must avoid rounded corners');
+  f.frame.css.backgroundColor = 'transparent';
+  assert.equal(enclosing(f), null, 'No default canvas color is invented');
+}));
+
+test('enclosing CSS pairs reject translucent, partial, native and uncertain ancestor paint', () => environment(() => {
+  const changes: [string, (f: ReturnType<typeof opaqueFixture>) => void][] = [
+    ['translucent layer', f => { f.wrapper.css.backgroundColor = 'rgba(255,255,255,.1)'; }],
+    ['translucent boundary', f => { f.frame.css.backgroundColor = 'rgba(36,38,38,.9)'; }],
+    ['unknown color', f => { f.wrapper.css.backgroundColor = 'unsupported-color'; }],
+    ['gradient', f => { f.wrapper.css.backgroundImage = 'linear-gradient(white,black)'; }],
+    ['image above opaque surface', f => { f.outer.css.backgroundImage = 'url(image.png)'; }],
+    ['border image', f => { f.frame.css.borderImageSource = 'url(image.png)'; }],
+    ['shadow', f => { f.frame.css.boxShadow = 'inset 0 0 20px black'; }],
+    ['mask', f => { f.wrapper.css.maskImage = 'linear-gradient(black,transparent)'; }],
+    ['clip path', f => { f.wrapper.css.clipPath = 'inset(10%)'; }],
+    ['legacy clip', f => { f.wrapper.css.clip = 'rect(0px,20px,20px,0px)'; }],
+    ['outer opacity', f => { f.outer.css.opacity = '.5'; }],
+    ['outer filter', f => { f.outer.css.filter = 'blur(1px)'; }],
+    ['scaled ancestor', f => { f.wrapper.css.transform = 'matrix(2,0,0,2,0,0)'; }],
+    ['native appearance', f => { f.wrapper.css.appearance = 'auto'; }],
+    ['native control', f => { f.frame.tagName = 'SELECT'; }],
+    ['anonymous fieldset surface', f => { f.frame.tagName = 'FIELDSET'; }],
+    ['replaced content', f => { f.wrapper.css.content = 'url(image.svg)'; }],
+    ['shadow host', f => { Object.assign(f.outer, { openOrClosedShadowRoot: {} }); }],
+    ['assigned slot', f => { Object.assign(f.hint, { assignedSlot: {} }); }],
+    ['top layer', f => { f.outer.matches = () => true; }],
+    ['non-HTML ancestor', f => { f.outer.namespaceURI = 'http://www.w3.org/2000/svg'; }],
+    ['content background clip', f => { f.frame.css.backgroundClip = 'content-box'; }],
+    ['partial background', f => { f.frame.box.width = 90; }],
+    ['fragmented background', f => { f.frame.getClientRects = () => [f.frame.box, f.frame.box]; }],
+  ];
+  for (const [name, change] of changes) { const f = opaqueFixture(); change(f); assert.equal(enclosing(f), null, name); }
+  const f = opaqueFixture();
+  for (const bounds of [{ ...rect, width: 0 }, { ...rect, left: NaN }, { ...rect, top: Infinity }]) assert.equal(enclosing(f, bounds), null);
+}));
+
+test('enclosing CSS pair proofs ignore boxless colors and bound the full ancestor chain', () => environment(() => {
+  const f = opaqueFixture();
+  f.wrapper.css.display = 'contents'; f.wrapper.css.backgroundColor = 'red';
+  assert.deepEqual(enclosing(f), { r: 36, g: 38, b: 38, a: 1 });
+  f.frame.css.display = 'contents'; assert.equal(enclosing(f), null, 'A declared boxless color supplies no background');
+  f.frame.css.display = 'block'; f.frame.tagName = 'BODY';
+  assert.deepEqual(enclosing(f), { r: 36, g: 38, b: 38, a: 1 }, 'An explicit covering body color is supported');
+  for (let i = 0; i < 60; i++) f.outer.parentElement = new Box(f.outer.parentElement);
+  assert.deepEqual(enclosing(f), { r: 36, g: 38, b: 38, a: 1 });
+  f.outer.parentElement = new Box(f.outer.parentElement);
+  assert.equal(enclosing(f), null, 'The traversal cannot silently ignore distant effects beyond its limit');
+}));
+
+test('enclosing CSS pairs do not replace unproven sibling controls or inspect their contents', () => environment(() => {
+  for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT', 'CANVAS']) {
+    const f = opaqueFixture(), control = new Box(f.wrapper); control.tagName = tagName;
+    for (const name of ['value', 'placeholder', 'textContent', 'innerText', 'childNodes']) {
+      Object.defineProperty(control, name, { get() { throw Error(`Control contents must not be read: ${name}`); } });
+    }
+    f.wrapper.children = [f.hint, control]; assert.equal(enclosing(f), null, tagName);
+    const other = new Box(f.wrapper); other.tagName = tagName;
+    f.wrapper.children.push(other); assert.equal(enclosing(f), null, `Ambiguous ${tagName} siblings`);
+  }
+  const f = opaqueFixture();
+  f.wrapper.children = [f.hint, ...Array.from({ length: 31 }, () => new Box(f.wrapper))];
+  assert.deepEqual(enclosing(f), { r: 36, g: 38, b: 38, a: 1 });
+  f.wrapper.children.push(new Box(f.wrapper)); assert.equal(enclosing(f), null, 'Sibling searches remain bounded');
+}));
+
+test('offscreen ancestor CSS pairs remain unverified and require consistent full-fragment coverage', () => environment(() => {
+  const f = opaqueFixture();
+  f.frame.box = { left: 0, top: -1000, right: 200, bottom: -920, width: 200, height: 80 };
+  Object.assign(f.hint.css, { color: 'white', fontSize: '12px', fontWeight: '500' });
+  const first = { ...rect, top: -980 }, second = { ...rect, top: -960 };
+  const geometry: TextRunGeometry = { rects: [first, second], limited: false };
+  let hitTests = 0;
+  const replacements = { SVGElement: class {}, innerWidth: 1280, innerHeight: 800,
+    document: { elementsFromPoint: () => { hitTests++; return [f.frame]; } } };
+  const previous = new Map(Object.keys(replacements).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(replacements)) Object.defineProperty(globalThis, key, { value, configurable: true });
+  const measure = () => measureRuns(f.hint as unknown as Element, new ElementRegistry('offscreen-ancestor'), DEFAULT_SETTINGS, 1, [geometry])[0]!;
+  try {
+    const run = measure();
+    assert.equal(run.contrast.ratio, null); assert.equal(run.contrast.status, 'manual');
+    assert.equal(run.contrast.reason, 'layered-background');
+    assert.deepEqual(run.effectiveBackground, { r: 36, g: 38, b: 38, a: 1 });
+    assert.equal(cssColorContrast(run)?.verified, false); assert.equal(cssColorContrast(run)?.AA?.status, 'pass');
+    assert.equal(hitTests, 0, 'The offscreen fallback does not sample viewport coordinates');
+    geometry.rects = [first, { ...second, left: 190 }];
+    assert.equal(cssColorContrast(measure()), null, 'Every original fragment must be fully covered');
+    geometry.rects.reverse(); assert.equal(cssColorContrast(measure()), null, 'Fragment order cannot discard a missing background');
+    geometry.rects = [first, second]; geometry.limited = true;
+    assert.equal(cssColorContrast(measure()), null, 'Truncated geometry cannot establish a CSS pair');
+    geometry.limited = false; geometry.rects = [first, rect];
+    assert.equal(cssColorContrast(measure()), null, 'Mixed viewport and offscreen fragments stay conservative');
+    geometry.rects = [first, second];
+    f.hint.getAttribute = name => { assert.equal(name, 'type'); return 'search'; };
+    f.hint.css.position = 'absolute'; f.hint.css.zIndex = '0';
+    const input = new Box(f.wrapper, { display: 'inline-block', backgroundColor: '#29323D', paddingRight: '100px' });
+    input.tagName = 'INPUT'; input.box = { ...f.frame.box };
+    f.wrapper.children = [f.hint, input];
+    geometry.rects = [{ ...first, left: 120, width: 40 }, second];
+    assert.equal(cssColorContrast(measure()), null, 'A sibling input and ancestor surface with different colors cannot form one pair');
+  } finally { for (const [key, descriptor] of previous) {
+    if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key);
+  } }
+}));
 
 test('an opaque ancestor covers complete text without inspecting editable or unrelated contents', () => environment(() => {
   const f = opaqueFixture();
@@ -258,6 +375,9 @@ test('all offscreen text fragments must share the reserved input padding before 
   f.parent.css.backgroundColor = '#212831';
   Object.assign(f.hint.css, { color: '#BFBFBF', fontSize: '11px', fontWeight: '400' });
   f.input.box = { left: 0, top: -1000, right: 200, bottom: -920, width: 200, height: 80 };
+  // The whole search container has been scrolled offscreen, not only its
+  // sibling input. Keep the ancestor paint rectangle consistent with the text.
+  f.parent.box = { ...f.input.box };
   const first = { ...hintRect, top: -980 }, second = { ...hintRect, top: -960 };
   const geometry: TextRunGeometry = { rects: [first, second], limited: false };
   const replacements = {

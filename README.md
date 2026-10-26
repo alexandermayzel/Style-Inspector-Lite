@@ -2,7 +2,7 @@
 
 <img src="assets/logo-source.png" alt="Style Inspector Lite" width="260">
 
-A local CSS inspector in Firefox's native sidebar. Inspect an element, check text contrast and small text, compare color suggestions, and export measured styles. **Not yet published.** The initial release is prepared as **1.0.1**.
+A local CSS inspector in Firefox's native sidebar. Inspect an element, check text contrast and small text, compare color suggestions, and export measured styles. Version **1.0.2** is dated **2026-10-26**; see the [changelog](CHANGELOG.md) for its changes.
 
 Licensed under the [Mozilla Public License 2.0](LICENSE). Third-party model notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
@@ -18,18 +18,23 @@ For local development, run `npm ci` and `npm run build` from the source director
 
 The `manifest.json` in the repository root is a **source file**, not a loadable build. Its generated JavaScript and icons live beside the built manifest in the external `dist` directory. Loading the root manifest can therefore produce a missing icon and a nonfunctional toolbar button. Remove that temporary installation and load the built manifest instead.
 
-The installable package is created one directory above the repository as **`../style-inspector-lite-1.0.1.zip`**. It is **unsigned**, despite having no `-unsigned` filename suffix. It is a review/development artifact; regular Firefox installation requires Mozilla signing. After publication, install through the Mozilla Add-ons listing above or use the signed XPI supplied by the maintainer.
+The installable package is created one directory above the repository as **`../style-inspector-lite-1.0.2.zip`**. It is **unsigned**, despite having no `-unsigned` filename suffix. It is a review/development artifact; regular Firefox installation requires Mozilla signing. After publication, install through the Mozilla Add-ons listing above or use the signed XPI supplied by the maintainer.
 
 ## Features
 
-- **Page audit:** explicitly scan the loaded main document for text contrast and text smaller than 12 CSS pixels. Separate rule summaries show passing results, confirmed failures, results that are not assessable, and cases where the rule does not apply.
-- **Page style overview:** after an audit, open Colors for the page palette or Typography for recorded CSS font-family stacks, without selecting an element. The overview identifies its scan scope and measurement status; font stacks include fallbacks and do not identify the actual rendered font face.
+- **Page audit:** explicitly scan the loaded main document, the initial visible area or a selected section for text contrast and text smaller than 12 CSS pixels. Separate rule summaries show passing results, confirmed failures, results that are not assessable, and cases where the rule does not apply. Results show the chosen scope, elapsed time and any reached scan limits; JSON reports retain this context.
+- **Page style overview:** after an audit, open Colors for a palette grouped by use, with optional frequency or hue sorting. Typography lists CSS font-family stacks by measured usage, with each observed CSS font size on its own row and expandable weight/line-height variants. Sizes and variants show the most frequent entries first; use the sorting control for smallest or largest sizes first. Open the compact, highlighted **Show occurrences** control on a color, family, size or variant to locate and inspect its measured elements. A notice identifies an inventory limit only when further distinct entries were omitted. Counts refer to measured text elements, not painted area; font stacks include fallbacks and do not identify the actual rendered font face.
+- **Grouped results:** optionally collapse identical audit results into expandable groups, with the original element actions and unchanged totals. Measured contrast, CSS-only comparisons and missing values remain separate.
+- **Troubleshooting:** filter missing measurements by their cause. A later inspection of the same text area can be compared with its original audit result and measurement time, without rewriting the earlier result or treating a CSS-only comparison as verified page contrast.
+- **Compare manual audits:** compare the current complete audit with the preceding complete audit of the same document and scope. Filter newly observed, resolved, persistent and unassessed findings, with both measurement times and values. Removed or unmeasurable text never counts as a resolved failure.
+- **Manage retained analyses:** open the analysis overview in Settings to see retained tabs, their measurement times and approximate analysis sizes. Clear one tab's analysis without clearing other tabs or changing preferences.
 - **Element inspection:** inspect via the context menu or an explicit picker. Contrast, colors, typography, and layout share one persistent sidebar. Hover previews remain separate from confirmed selections.
-- **Manual contrast:** open Contrast without an element selection to enter text/background HEX colors or choose them with inline color pickers. The live preview and separate normal/large-text AA/AAA ratings work locally without website access.
+- **Manual contrast:** enter text/background HEX or numeric RGB colors, use the inline color pickers, or send a page-palette color directly to the calculator. Transparent backgrounds require an explicit opaque underlay. The live preview and separate normal/large-text AA/AAA ratings describe this local color comparison.
+- **Targeted diagnostics:** enable the diagnostic button in Settings (off by default), then explicitly copy a bounded diagnostic JSON report for an uncertain audit result or selected text area. It includes measurement reasons and sanitized background-layer information for troubleshooting.
 - **Contrast suggestions:** compare verified changes to one color at a time. Original and suggested colors have labeled swatches and prominent color codes with individual copy buttons. The suggested color is shown and copied as HEX regardless of the general color-format preference. Suggestions are recommendations; the extension does not apply them to the website.
 - **Color vision comparison:** local protanopia, deuteranopia, tritanopia and grayscale previews, alongside original measured colors.
 - **Color values:** compact square swatches beside measured colors, suggestions and HEX values in export previews. Transparent colors use a checkerboard; unavailable colors show a question mark. Swatches do not change copied or exported text.
-- **Local exports:** CSS, SCSS, structured JSON, and Tailwind CSS v4, with exact previews and an optional browser save dialog.
+- **Local exports:** CSS, SCSS, structured JSON, and Tailwind CSS v4, with code previews and an optional browser save dialog.
 - English by default, complete German interface, and English fallback for other browser languages.
 
 Measured color labels and their individual copy buttons honor the selected format.
@@ -45,9 +50,9 @@ The declared compatibility target is Firefox Desktop **142.0 or later**, with a 
 ## Getting started
 
 1. Click the extension's toolbar button to open and activate the sidebar. A newly opened sidebar starts on **Page audit** without running a scan or picker. Clicking again keeps an open sidebar open.
-2. Choose **Check page** for a page audit. Scans are chunked and can be cancelled; partial results are marked. Open **Colors** or **Typography** for the page palette and CSS font-family overview. **Check again** starts a fresh analysis, discarding the previous audit, element selection and temporary analysis views while preserving your five preferences.
+2. Choose the audit scope, then **Check page**. Selecting a different scope does not start a measurement. **Visible area** uses the viewport at scan start and does not scroll the page; select an element first to audit its section. Scans yield between small batches, including within large individual text elements, and can be cancelled; partial results and reached limits are marked. Open **Colors** or **Typography** for the palette and CSS font-family overview of that audit scope. Once **Check again** starts successfully, it clears the element selection and temporary analysis views while retaining the preceding complete audit for comparison. If the new scan cannot start, the previous result and selection remain available. A section audit retains its root for an explicit rescan; a removed root requires a new selection.
 3. Choose **Select element**, hover a page element, then click to confirm. Escape or **Stop selecting** restores the previous selection. Alternatively, right-click an element and choose **Inspect with Style Inspector** to inspect it directly.
-4. Use the four element tabs. Audit results also offer **Show on page** and **Inspect**, including results that are not assessable or have older measurements. **Show on page** scrolls to the element and marks it for eight seconds with a contrasting outline and its selector beside it. The mark follows scrolling and resizing; Escape on the webpage dismisses it. These actions require the original element to remain in the same document; **Inspect** measures it again. If an explicit inspection contradicts a completed or partial audit, the extension automatically performs one fresh page audit while keeping the selected element open. All rows, totals, page styles and measurement time are rebuilt together; individual results are not merged into the old scan. Unchanged inspections, hover previews and cancelled audits do not restart scanning. A contradictory measurement during a running scan marks that scan partial and stale, without queuing another scan. A later batch that contradicts the earlier inspection also marks that selection stale; neither measurement is silently substituted for the other. **Check again** still clears the selection and starts over. A removed element is reported instead of choosing a replacement.
+4. Use the four element tabs. Audit results offer **Show on page** and **Inspect**, including uncertain or older results. **Show on page** scrolls to the element and marks it for eight seconds; Escape dismisses the mark. **Inspect** measures only that element. If its result contradicts the audit, the original audit is marked stale; its rows, totals and timestamp stay together until you choose **Check again**. Use **Measure again** to refresh the selected element. Page changes, scrolling, resizing and reopening the sidebar never start another measurement automatically. A removed element is reported instead of choosing a replacement.
 
 Fresh measurements of the same selected element retain the chosen text node,
 even if other text nodes move or disappear. If the requested text area is no
@@ -61,6 +66,33 @@ preserves the earlier choice. A superseded audit action cannot change that choic
 The optional website permission covers **all HTTP and HTTPS websites**, not just the current website. Firefox retains the grant until you revoke it in the extension's permissions, so later scans on other websites need no renewed grant. It is requested only from an explicit **Check page** or **Check again** click when document access is missing; declining leaves the toolbar/context-menu workflow available. No website permission is required at installation. Protected browser pages remain inaccessible.
 
 Closing the sidebar ends its picker. Page audits belong to the document and can continue with the sidebar closed. A new document invalidates previous results. Opening the sidebar or navigating never starts analysis automatically; navigation alone does not inject the inspector, even with website access granted.
+
+The picker highlights immediately and waits briefly for the pointer to settle
+before measuring a hover preview. Large typography lists show twelve families
+or sizes at a time; use **More font families** or **More sizes** for the next
+entries and expand a font family's variant list to load its variants. Recent
+analyses share a bounded in-memory cache. Older analysis payloads may be released
+when the cache fills; explicitly scan that tab again
+if its results are no longer available. This cache limit is not a limit on the
+browser's total memory usage. Each retained tab can keep the current audit and
+one preceding complete audit; the older comparison baseline is released first
+when space is tight. The Settings overview reports an estimate of analysis data,
+not Firefox's total memory or an exact storage quota measurement. Analysis results
+are never written to extension storage. Reloading the page, restarting Firefox
+or restarting the extension's background context discards them; start a new
+measurement explicitly. Lightweight document authorization metadata may remain
+in browser session storage; it contains no measurements. Preferences remain saved.
+
+Audit comparison requires two completed measurements of the same document,
+scope and viewport size. Section audits must share the same root; visible-area
+audits must also share their initial scroll position. A reload, changed scope,
+partial scan or stale current result cannot establish that comparison. Both
+snapshots are assessed under the currently selected AA/AAA target. Counts refer
+to individual contrast or small-text findings, so one text area can contribute
+twice. **New** means newly observed as failing, including newly measurable text;
+it does not establish when the problem was introduced. **Resolved** requires a
+previous failure and a current measured pass. Removed, hidden or unassessed text
+is not proof of a repair. The comparison remains local and does not trigger scans.
 
 **Not assessable** means the automatic check cannot give a reliable verdict. It counts as neither pass nor fail and is not a confirmed problem. Its reason helps you decide what to inspect manually. Contrast results and the small-text readability threshold have separate counts; **Not applicable** is also shown separately.
 
@@ -77,8 +109,15 @@ The gear opens settings inside the same sidebar. Changes are saved immediately.
 | Contrast target | AA | Reassess measured contrast at AA or AAA without rescanning. |
 | Live selection preview | On | Temporarily show hovered element measurements while selecting. |
 | Context menu entry | On | Show or remove the single page inspection menu item. |
+| Show diagnostic button | Off | Enable **Copy diagnostics** in audit results and element inspection for troubleshooting. |
 
-**Clear analysis data** requires confirmation and clears this extension's session snapshots across sidebars, stopping ongoing analysis and invalidating pending exports. It preserves settings, previously copied text, and files already saved by the user. **Reset settings** requires confirmation and resets only the five preferences. Browser shortcut assignments and optional permissions remain unchanged.
+**Clear analysis data** requires confirmation and clears this extension's temporary snapshots across sidebars, stopping ongoing analysis and invalidating pending exports. It preserves settings, previously copied text, and files already saved by the user. **Reset settings** requires confirmation and resets only preferences. Browser shortcut assignments and optional permissions remain unchanged.
+
+The retained-analysis overview can be refreshed explicitly and supports clearing
+one tab after confirmation. This removes that tab's selected element, current
+audit and comparison baseline, and stops its pending analysis. Other tabs remain
+available. Tab titles are read only to label this overview; they are not added to
+stored analysis or standard exports.
 
 The inspector declares an opening command without assigning a potentially conflicting shortcut. Assign it in Firefox's Add-ons Manager, under the gear menu's **Manage Extension Shortcuts**. The settings page shows the actual assignment.
 
@@ -86,12 +125,18 @@ The inspector declares an opening command without assigning a potentially confli
 
 The left footer button copies the current tab's data: a readable audit/contrast report, generated color variables, or curated typography/layout CSS. In the Colors or Typography page overview without an element selection, Copy produces generated page color and font variables, and Export opens the page-values source. Selecting an element restores that element's copy/export scope. Unconfirmed preview values cannot be copied or exported.
 
-The manual calculator accepts opaque `#RGB` and `#RRGGBB` values, normalizes valid
-HEX to uppercase when leaving the field, and hides results for invalid input.
-The palette opens beside each HEX field. Clicking or dragging its saturation/brightness field selects that visible color, including when starting from black. Hue, saturation and brightness also have keyboard-accessible sliders. Opening a palette leaves the current color unchanged; changing hue from black, white or gray starts a visible saturated color. Escape closes the palette.
+The manual calculator accepts `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` and numeric
+RGB/RGBA colors. It normalizes values without reducing precision and hides
+results for invalid input. A transparent background requires an explicitly chosen
+opaque underlay; no page background is guessed. Text alpha is composed over the
+resolved background. Page-palette actions retain precise measured channels even
+when the palette's displayed HEX value is rounded.
+The color picker opens beside each field. Clicking or dragging its saturation/brightness field selects an opaque color, including when starting from black. Hue, saturation and brightness also have keyboard-accessible sliders. Opening a picker leaves the current input unchanged; changing hue from black, white or gray starts a visible saturated color. Escape closes the picker.
 Its draft stays in the open sidebar across tabs and webpage navigation; **Clear
 data** resets it. **Copy** produces a clearly labeled manual report. File export
 is unavailable because these colors are not webpage measurements.
+Opening the calculator from a palette preserves the selected element and offers
+a return action. Merely viewing a calculated pair does not update audit verdicts.
 
 **Export…** opens an exact, frozen preview. Select an element, scanned page values, or an audit report; choose the scope and format. Original element exports always contain original measurements. **Export suggestion…** explicitly selects a separate, unapplied correction to one color. Viewing recommendations never replaces original data.
 
@@ -104,11 +149,33 @@ is unavailable because these colors are not webpage measurements.
 
 Generated names such as `--sil-color-001`, `$sil-color-001`, and `--color-sil-001` are new export names, not recovered source design tokens. CSS dimensions and visual bounding rectangles are distinct. Unsupported or unsafe values are omitted with warnings.
 
+Page-value exports default to the measured Colors/Typography overview, including
+placeholder styles and resolved backgrounds. **Palette and font source** can
+instead select raw element CSS properties. Both choices use the frozen audit's
+scope; overview filters and sorting do not alter token order or export scope.
+Overview quick-copy uses measured usage. JSON identifies an explicit choice with
+`inventory: "measured"` or `"css"`; existing serializer callers without this option
+retain the raw-CSS format.
+
+Large previews show only the first 65,536 UTF-16 units, with a visible shortening
+notice and at most 256 decorative color swatches. Copy and Save file retain the
+complete export. Unchanged previews preserve keyboard focus and reading position.
+
 For Tailwind v4, copy the complete utility names into a source file scanned by your own Tailwind build. Import the generated theme CSS from your existing v4 stylesheet. The export does not reset your theme. SCSS is compiled by your own Sass build. Neither compiler ships in the extension. See the [export schema and reproducible examples](tests/fixtures/export/README.md).
 
 JSON uses the extension's own `schemaVersion: 2` format, with `kind` equal to `element`, `page-tokens`, `audit`, or `contrast-suggestion`. It is not a DTCG or Figma schema. Suggested changes carry `applied: false`. Internal browser/document IDs, page text excerpts, and webpage input values are not included in standard exports.
 
-After explicitly selecting an element, an **Element text** card at the bottom helps locate it on the page or in its source. Contrast shows the chosen text area's excerpt (up to 500 UTF-16 units); the other element tabs show a combined excerpt (up to 2,000). Whitespace is normalized, combined fragments are separated by spaces, and shortening is indicated. This is DOM text from measured text nodes, so a partially clipped node can include more than its visible ellipsis and CSS text transformations are not reproduced. **Copy text** copies this excerpt separately. Form values, placeholders, editable areas and text-bearing attributes are excluded. Audits and unconfirmed picker previews do not collect excerpts. Excerpts stay in live selection memory, are removed before session storage, and are absent from ordinary reports and exports.
+After explicitly selecting an element, an **Element text** card at the bottom helps locate it on the page or in its source. Contrast shows the chosen text area's excerpt (up to 500 UTF-16 units); the other element tabs show a combined excerpt (up to 2,000). Whitespace is normalized, combined fragments are separated by spaces, and shortening is indicated. This is DOM text from measured text nodes, so a partially clipped node can include more than its visible ellipsis and CSS text transformations are not reproduced. **Copy text** copies this excerpt separately. Form values, placeholders, editable areas and text-bearing attributes are excluded. Audits and unconfirmed picker previews do not collect excerpts. Excerpts stay in live selection memory and are absent from extension storage, ordinary reports and exports.
+
+The diagnostic button is hidden by default. Enable **Show diagnostic button**
+in Settings when troubleshooting. **Copy diagnostics** creates a separate `contrast-diagnostic` JSON report only on
+request. It pairs the original measurement and timestamp with currently observed,
+bounded paint layers and a separate capture timestamp; it does not perform a new
+contrast assessment. Only allowlisted numeric/style values, generic element tags
+and summarized effects are included. Page text, HTML, input values, selectors,
+IDs, classes, URLs and arbitrary CSS strings are omitted. Reports are copied
+locally, never saved in extension session storage or included in standard exports.
+Navigation, rescans and superseding selections invalidate pending requests.
 
 Editor text is excluded before reading its contents, including plaintext-only
 editors, mixed-case `contenteditable` values, textbox roles and whole-document
@@ -142,9 +209,9 @@ running, cancelled and partial scans.
 - Floating search hints can retain their unverified CSS color pair outside the viewport when one immediate input sibling and its reserved padding establish the same pair. This does not certify the page's rendered contrast or read control contents.
 - Empty absolute side decorations can be excluded from contrast uncertainty when their resolved paint bounds are proven separate from the text ink. Unknown containing blocks, effects, transformations and actual overlaps remain unassessed.
 - Offscreen text in ordinary layout can retain its enclosing opaque background. A legacy `float` declaration on a direct flex/grid item does not invalidate that check, because it does not float the item. Actual floating, displaced or ambiguously slotted text remains conservative.
-- Frames, Shadow DOM text, images/canvas and unseen dynamic content are outside the audit scope. Scans inspect rendered main-document content, including offscreen content, without automatic scrolling or loading. An audit stops at 1,000 text runs or 20,000 visited elements and marks incomplete results. Page palettes retain at most 128 colors and 64 CSS font families. Viewport or DOM changes can make snapshots stale; scrolling during a scan also marks that scan partial and stale. Highlighting a result does not itself invalidate a completed audit. Later scrolling, hover or other paint changes can produce different measurements; an explicit conflicting inspection refreshes the audit once, without retrying until a result passes. Actual uncertainty remains unassessed.
+- Frames, Shadow DOM text, images/canvas and unseen dynamic content are outside the audit scope. Scans inspect rendered main-document content, including offscreen content, without automatic scrolling or loading. An audit stops at 1,000 text runs or 20,000 visited elements and marks incomplete results. Style inventories retain at most 128 colors, 64 CSS font families, and 1,000 distinct sizes and variants per family, associated with at most 1,000 measured elements. Colors and Typography show when their relevant inventory limits actually omit further entries; reports retain these limits separately from overall scan limits. Viewport, scroll or DOM changes mark affected snapshots stale; a change during a scan also marks it partial and stale. Once results are stale, continuous page observation stops until the next explicit measurement. Highlighting does not change results, but scrolling to a result can mark them stale. A conflicting inspection never starts another page audit. Actual uncertainty remains unassessed.
 - CSS font families describe the page's declarations, not proven glyph-level rendered fonts. Sidebar font previews use available local fonts and may substitute; web fonts are not downloaded.
-- Only the five preferences use the extension's persistent local storage. Bounded analysis snapshots use browser session storage; optional permission grants are managed separately by Firefox. Live element references retain only the current audit, selection and hover preview; obsolete and removed elements are released. Moving a tab to another browser window resets its old analysis. There is no backend, account, telemetry, remote code or runtime resource download.
+- Only preferences use the extension's persistent local storage. Analysis snapshots remain in memory; browser session storage keeps only lightweight document authorization metadata. Optional permission grants are managed separately by Firefox. Live element references retain only the current audit, selection and hover preview; obsolete references are released when analysis is refreshed, cleared or evicted. Reloading a page or moving a tab to another browser window resets its old analysis. There is no backend, account, telemetry, remote code or runtime resource download.
 - Selection suppression applies to the event handlers the extension can intercept. A handler already executed by a page before the picker listener cannot be undone.
 - This is a focused inspection tool, not a complete accessibility audit or certification.
 
@@ -164,10 +231,10 @@ Style-Inspector-Lite/
   manifest.json         Source manifest; do not load this file into Firefox
 Style-Inspector-Lite-artifacts/
   dist/                 Generated loadable extension; select its manifest.json
-  releases/v1.0.1/       Source ZIP, checksums and separate submission documents
+  releases/v1.0.2/       Source ZIP, checksums and separate submission documents
   screenshots/en/, de/   Rendered 380 × 800 fixture screenshots
   archive/              Preserved earlier local artifacts
-style-inspector-lite-1.0.1.zip  Unsigned installable package beside the repository
+style-inspector-lite-1.0.2.zip  Unsigned installable package beside the repository
 ```
 
 Test sources and build tools are kept in the source archive and excluded from the installable ZIP. Local maintainer instructions remain outside the repository and are not build dependencies.
@@ -182,6 +249,8 @@ npm run build
 npm run lint:extension
 npm run test:ui
 npm run test:contrast
+npm run test:counters
+npm run test:paint
 npm run test:firefox
 npm run test:source
 npm run start:firefox
@@ -198,7 +267,11 @@ UI tests use Playwright with installed Microsoft Edge by default; set `UI_BROWSE
 
 `npm run test:source` archives the current source allowlist, installs the lockfile dependencies in a temporary extracted directory, builds and typechecks there, and compares every runtime file's SHA-256 hash against the existing external build. Run it after building. Add `-- --offline --cache /absolute/npm-cache` to use a populated cache without registry access; results are recorded in `test-results/source-rebuild.json`.
 
-`npm run package` creates `../style-inspector-lite-1.0.1.zip` and `../Style-Inspector-Lite-artifacts/releases/v1.0.1/style-inspector-lite-1.0.1-source.zip`. `-- --artifacts /path/to/external-artifacts` changes the external build/source-release destination; `--runtime-dir /path/to/package-directory` changes the directory containing the installable ZIP. The builder validates real paths, rejects destinations inside the repository, and refuses to overwrite existing packages. Both archives reflect the actual working files; no commit is required. Builds do not increment versions or invoke Git/signing/upload commands.
+`npm run test:counters` checks clipped animated number wheels with the built content script, including visible and partly clipped digits, changing counter values, expansion, preserved whitespace and actual overlays. Add `-- --firefox` to run the same fixtures in Firefox using the test binaries described above. Results are written under the external artifact directory's `test-results/`.
+
+`npm run test:performance` measures synthetic simple, deeply nested and wide pages, hover previews and passive mutation handling. Add `-- --firefox` for Firefox or `-- --firefox --no-counts` for timing without style-call instrumentation. It asserts result counts and absence of automatic remeasurement; timing remains a diagnostic rather than a machine-dependent pass threshold. Reports go to the external artifact directory's `test-results/`. The browser messaging layer is stubbed in this focused test; use the native Firefox harness for complete extension workflows.
+
+`npm run package` creates `../style-inspector-lite-1.0.2.zip` and `../Style-Inspector-Lite-artifacts/releases/v1.0.2/style-inspector-lite-1.0.2-source.zip`. `-- --artifacts /path/to/external-artifacts` changes the external build/source-release destination; `--runtime-dir /path/to/package-directory` changes the directory containing the installable ZIP. The builder validates real paths, rejects destinations inside the repository, and refuses to overwrite existing packages. Both archives reflect the actual working files; no commit is required. Builds do not increment versions or invoke Git/signing/upload commands.
 
 For AMO's question about generated or preprocessed code, answer **Yes** and submit the matching source ZIP. This project transpiles TypeScript, bundles modules and generates icons even though JavaScript minification is disabled. Mozilla requires source and reproducible build instructions for bundled or otherwise preprocessed code. [Source code submission requirements](https://extensionworkshop.com/documentation/publish/source-code-submission/).
 

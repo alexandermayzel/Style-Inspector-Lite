@@ -6,17 +6,37 @@ import type { GradientBackgroundLayer } from '../core/gradients';
 import { STYLE_PROPERTIES } from '../core/exports';
 import { randomId } from './id';
 import { pseudoIsSeparated } from './pseudo-geometry';
-import { negativeBackground, opaqueAncestorCoversText, siblingControlCssBackground, singleSiblingInput } from './background-geometry';
+import { enclosingCssBackground, negativeBackground, opaqueAncestorCoversText, siblingControlCssBackground, singleSiblingInput } from './background-geometry';
 import { coveringOpaqueGradient } from './background-image-geometry';
+import { backgroundPaintCoverage, hasUnboundedPaintTransform } from './background-paint-coverage';
+import { textPseudoStyle, withTextPseudoBatch } from './text-pseudo-style';
 import { unclippedTextRects } from './text-visibility';
 import { visibleTextSampleRect } from './text-sampling';
 import { hasEmptyOverflow, mayEscapeOverflow } from './empty-overflow';
 import { combineTextExcerpts, permitsTextExcerpt, readTextExcerpt } from './text-excerpt';
-import type { BackgroundRange, ColorValue, DocumentIdentity, Settings, Snapshot, TextRun } from '../core/types';
+import type { BackgroundRange, ColorValue, DocumentIdentity, Settings, Snapshot, TextRun, Viewport } from '../core/types';
 
 export const OVERLAY_ATTRIBUTE = 'data-style-inspector-overlay';
 const PROPERTIES = STYLE_PROPERTIES;
 const ownElements = new WeakSet<Element>();
+const excludedTextTags = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'HEAD']);
+interface MeasurementStyleCache { entries: WeakMap<Element, Map<string, CSSStyleDeclaration>>; size: number }
+let styleCache: MeasurementStyleCache | null = null;
+/** CSSOM declarations stay live. Retain only their bounded handles during one
+ * capture, never inferred paint/geometry or selectors across asynchronous work. */
+export function createMeasurementStyleCache(): MeasurementStyleCache { return { entries: new WeakMap(), size: 0 }; }
+let ownershipCache: WeakMap<Element, boolean> | null = null;
+function measuredStyle(element: Element, pseudo = ''): CSSStyleDeclaration {
+  const cached = styleCache?.entries.get(element)?.get(pseudo);
+  if (cached) return cached;
+  const style = getComputedStyle(element, pseudo || undefined);
+  if (styleCache && styleCache.size < 2048) {
+    let entries = styleCache.entries.get(element);
+    if (!entries) { entries = new Map(); styleCache.entries.set(element, entries); }
+    entries.set(pseudo, style); styleCache.size++;
+  }
+  return style;
+}
 
 /** Keep ownership after removal or attribute changes; page lookalikes are not ours. */
 export function registerOwnElement(element: Element) { ownElements.add(element); }
@@ -24,7 +44,9 @@ export function registerOwnElement(element: Element) { ownElements.add(element);
 /** Never use selector lookup to resurrect an element: refs identify actual DOM objects. */
 export class ElementRegistry {
   private ids = new WeakMap<Element, string>();
-  private elements = new Map<string, Element>();
+  // Saved analysis must not keep a detached SPA subtree alive. The DOM itself
+  // owns connected elements; a dead/disconnected reference cannot be selected.
+  private elements = new Map<string, WeakRef<Element>>();
   private textIds = new WeakMap<Text, number>();
   private serial = 0;
   private textSerial = 0;
@@ -34,8 +56,10 @@ export class ElementRegistry {
     if (!id) {
       id = `${this.token}:e${++this.serial}`;
       this.ids.set(element, id);
-      this.elements.set(id, element);
     }
+    // A later explicit measurement can reactivate the same DOM identity after
+    // the preceding audit's selectable references have been released.
+    if (!this.elements.has(id)) this.elements.set(id, new WeakRef(element));
     return id;
   }
   /** Run identity follows the actual Text object and its current owner, not its ordinal. */
@@ -48,18 +72,21 @@ export class ElementRegistry {
     return `${this.reference(element)}:node${id}`;
   }
   get(id: string): Element | null {
-    const element = this.elements.get(id);
+    const element = this.elements.get(id)?.deref();
     return element?.isConnected ? element : null;
   }
   /** Keep only references that a current audit, selection or preview can use. */
   retain(references: ReadonlySet<string>) {
-    for (const [id, element] of this.elements) {
-      if (references.has(id) && element.isConnected) continue;
+    for (const [id, reference] of this.elements) {
+      const element = reference.deref();
+      if (references.has(id) && element?.isConnected) continue;
       this.elements.delete(id);
-      this.ids.delete(element);
     }
   }
-  clear() { this.ids = new WeakMap(); this.textIds = new WeakMap(); this.elements.clear(); }
+  clear(preserveIdentity = false) {
+    if (!preserveIdentity) { this.ids = new WeakMap(); this.textIds = new WeakMap(); }
+    this.elements.clear();
+  }
 }
 
 export function viewport() {
@@ -67,8 +94,16 @@ export function viewport() {
 }
 
 export function isOwnElement(element: Element): boolean {
-  for (let current: Element | null = element; current; current = current.parentElement) if (ownElements.has(current)) return true;
-  return false;
+  const ancestors: Element[] = [];
+  let owned = false;
+  for (let current: Element | null = element; current; current = current.parentElement) {
+    if (ownElements.has(current)) { owned = true; break; }
+    const cached = ownershipCache?.get(current);
+    if (cached !== undefined) { owned = cached; break; }
+    if (ownershipCache) ancestors.push(current);
+  }
+  for (const ancestor of ancestors) ownershipCache!.set(ancestor, owned);
+  return owned;
 }
 
 /** Recognize empty clips without guessing at arbitrary shapes or viewport visibility. */
@@ -130,7 +165,7 @@ function hiddenDetailsContent(element: Element): boolean {
   // Newer Firefox allows author overrides on this anonymous content wrapper.
   // A boxless wrapper cannot enforce content-visibility; older Firefox exposes
   // no pseudo style and uses the native open state instead.
-  const content = getComputedStyle(element, '::details-content');
+  const content = measuredStyle(element, '::details-content');
   if (content.display === 'none') return true;
   if (content.display === 'contents') return false;
   if (content.contentVisibility === 'hidden') {
@@ -143,21 +178,24 @@ function hiddenDetailsContent(element: Element): boolean {
 }
 
 function hasRenderedBox(element: Element, checkVisibility = true): boolean {
-  if (isOwnElement(element) || ['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'HEAD'].includes(element.tagName)) return false;
-  const style = getComputedStyle(element);
+  if (isOwnElement(element) || excludedTextTags.has(element.tagName)) return false;
+  const style = measuredStyle(element);
   if (checkVisibility && ['hidden', 'collapse'].includes(style.visibility)) return false;
   // Keep normal offscreen/content-visibility:auto text in scope. The default
   // native check detects skipped anonymous boxes without testing the viewport,
   // opacity or inherited visibility. display:contents needs the ancestry below.
   if (style.display !== 'contents' && element.checkVisibility?.() === false) return false;
   let ancestorOverflowApplies = true, ancestorPaintApplies = true;
-  let branch: Element | null = null;
+  let branch: Element | null = null, depth = 0;
   for (let current: Element | null = element; current; current = renderedParent(current)) {
+    // Geometry may remain visible, but paintingConditions will retain an
+    // explicit uncertainty reason rather than approve unvisited ancestor paint.
+    if (++depth > 512) break;
     if (branch && hiddenDetailsContent(current)) {
       const summary = Array.from(current.children).find(child => child.namespaceURI === current!.namespaceURI && child.tagName === 'SUMMARY');
       if (branch !== summary) return false;
     }
-    const ancestor = getComputedStyle(current);
+    const ancestor = measuredStyle(current);
     if (ancestor.display === 'none' || ancestor.display !== 'contents' && ancestor.contentVisibility === 'hidden') return false;
     // Boxless slots/wrappers have no opacity or clipping surface. Top-layer
     // descendants escape ancestor paint effects, but not display:none.
@@ -176,7 +214,7 @@ export function isRendered(element: Element): boolean { return hasRenderedBox(el
 
 function placeholderStyle(element: Element): CSSStyleDeclaration | null {
   // The browser exposes this state without reading form values or hint text.
-  return element.tagName === 'INPUT' && element.matches(':placeholder-shown') ? getComputedStyle(element, '::placeholder') : null;
+  return element.tagName === 'INPUT' && element.matches(':placeholder-shown') ? measuredStyle(element, '::placeholder') : null;
 }
 
 function hiddenPlaceholder(element: Element, style: CSSStyleDeclaration): boolean {
@@ -186,7 +224,7 @@ function hiddenPlaceholder(element: Element, style: CSSStyleDeclaration): boolea
 /** A native click target may have no painted label, while its box still paints. */
 function hiddenButtonText(element: Element): boolean {
   if (element.tagName !== 'INPUT' || !['button', 'submit', 'reset'].includes((element.getAttribute('type') ?? 'text').toLowerCase())) return false;
-  const style = getComputedStyle(element);
+  const style = measuredStyle(element);
   const rawFill = style.getPropertyValue?.('-webkit-text-fill-color');
   const fill = rawFill?.toLowerCase() === 'currentcolor' ? style.color : rawFill;
   if (!fill || parseColor(fill).rgba?.a !== 0 || style.textShadow !== 'none' || style.textEmphasisStyle !== 'none'
@@ -201,6 +239,7 @@ function hiddenButtonText(element: Element): boolean {
 export interface TextRunGeometry {
   rects: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>[];
   limited: boolean;
+  viewportPartial?: true;
   /** Local identity only; never serialized or used to read page text. */
   identityNode?: Text;
   /** Local reference only, never serialized; absent for audits and picker previews. */
@@ -209,40 +248,67 @@ export interface TextRunGeometry {
 
 const MAX_TEXT_RECTS = 32;
 
-export function directTextCount(element: Element, maximum = Infinity, geometry?: TextRunGeometry[], includeText = false): number {
+export function directTextCount(element: Element, maximum = Infinity, geometry?: TextRunGeometry[], includeText = false, within?: Viewport): number {
+  let count = 0;
+  for (const item of iterateDirectText(element, maximum, includeText, within)) {
+    if (!item) continue;
+    if (item !== 'control') geometry?.push(item);
+    count++;
+  }
+  return count;
+}
+
+/** Null steps let an audit yield even inside wrappers full of blank or nontext
+ * children. The synchronous selection path consumes the same iterator. */
+export function* iterateDirectText(element: Element, maximum = Infinity, includeText = false, within?: Viewport): Generator<TextRunGeometry | 'control' | null> {
   // Enumerated contenteditable values are case-insensitive and include
   // plaintext-only. Exclude editor subtrees, including nested false islands,
   // before checking whitespace; a standalone false declaration remains text.
-  if (maximum <= 0 || element.ownerDocument?.designMode?.toLowerCase() === 'on'
+  if (maximum <= 0 || excludedTextTags.has(element.tagName) || element.ownerDocument?.designMode?.toLowerCase() === 'on'
     || (element as HTMLElement).isContentEditable === true
     || element.closest('textarea,[contenteditable="true" i],[contenteditable="plaintext-only" i],[contenteditable=""]')
-    || element.tagName !== 'INPUT' && element.closest('[role~="textbox" i],[role~="combobox" i],[role~="searchbox" i]')) return 0;
-  const rendered = isRendered(element);
-  // An internal slot may override a host's inherited visibility for its own
-  // assigned Text nodes. Other hiding effects still apply to the whole host.
-  if (!rendered && (!element.shadowRoot || !hasRenderedBox(element, false))) return 0;
+    || element.tagName !== 'INPUT' && element.closest('[role~="textbox" i],[role~="combobox" i],[role~="searchbox" i]')) return;
+  // Most visited nodes are structural wrappers. No style/layout ancestry reads
+  // are needed until a native control or a nonblank direct Text node exists.
   if (element.tagName === 'INPUT') {
+    if (!isRendered(element)) return;
+    if (within && !intersectsViewport(element.getBoundingClientRect(), within)) return;
     const type = (element.getAttribute('type') ?? 'text').toLowerCase();
-    if (['checkbox', 'radio', 'range', 'color', 'file', 'image', 'hidden'].includes(type)) return 0;
-    if (hiddenButtonText(element)) return 0;
+    if (['checkbox', 'radio', 'range', 'color', 'file', 'image', 'hidden'].includes(type)) return;
+    if (hiddenButtonText(element)) return;
     const placeholder = placeholderStyle(element);
-    return placeholder && hiddenPlaceholder(element, placeholder) ? 0 : 1; // Style metadata only; never read values.
+    if (!placeholder || !hiddenPlaceholder(element, placeholder)) yield 'control'; // Style metadata only; never read values.
+    return;
   }
+  let rendered: boolean | undefined;
   let count = 0;
   const captureText = includeText && permitsTextExcerpt(element);
-  for (const child of element.childNodes) {
-    if (child.nodeType !== Node.TEXT_NODE || !child.nodeValue?.trim()) continue;
-    if (hiddenDetailsContent(element)) continue;
+  // NodeList is live across cooperative pauses. A page appending blank nodes
+  // must not extend one element's work forever; mutation observation marks the
+  // unfinished snapshot stale and the next explicit scan can include additions.
+  const children = element.childNodes, childLimit = children.length;
+  for (let childIndex = 0; childIndex < childLimit; childIndex++) {
+    const child = children[childIndex];
+    if (!child) break;
+    if (child.nodeType !== Node.TEXT_NODE || !child.nodeValue?.trim()) { yield null; continue; }
+    if (rendered === undefined) {
+      rendered = isRendered(element);
+      // A slot can override inherited visibility without overriding other
+      // effects that hide the whole host.
+      if (!rendered && (!element.shadowRoot || !hasRenderedBox(element, false))) return;
+    }
+    if (hiddenDetailsContent(element)) { yield null; continue; }
     // A host's own box can be visible while its light-DOM text is assigned to
     // a hidden internal slot. Text uses that slot's inherited visibility.
     const slot = (child as Text).assignedSlot;
-    if (slot ? !isRendered(slot) : !rendered) continue;
+    if (slot ? !isRendered(slot) : !rendered) { yield null; continue; }
     const range = document.createRange();
     range.selectNodeContents(child);
     const measured: TextRunGeometry = { rects: [], limited: false };
     let visible = false;
     for (const rect of range.getClientRects()) {
       if (rect.width <= 0 || rect.height <= 0) continue;
+      if (within && !intersectsViewport(rect, within)) { measured.viewportPartial = true; continue; }
       visible = true;
       if (measured.rects.length >= MAX_TEXT_RECTS) { measured.limited = true; break; }
       measured.rects.push({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
@@ -251,17 +317,49 @@ export function directTextCount(element: Element, maximum = Infinity, geometry?:
     if (visible && measured.rects.length) {
       measured.identityNode = child as Text;
       if (captureText) measured.textNode = child as Text;
-      geometry?.push(measured);
+      yield measured;
       if (++count >= maximum) break;
-    }
+    } else yield null;
   }
-  return count;
+}
+
+function intersectsViewport(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>, within: Viewport): boolean {
+  return rect.width > 0 && rect.height > 0 && rect.left < within.width && rect.top < within.height
+    && rect.left + rect.width > 0 && rect.top + rect.height > 0;
+}
+
+type LabelCache = WeakMap<Element, { ordinals: WeakMap<Element, number>; counts: Map<string, number>; next: Element | null; examined: number }>;
+let labelCache: LabelCache | null = null;
+/** Reuse ordinal work only inside one synchronous batch, never across a yield. */
+export function withMeasurementBatch<T>(measure: () => T, retainedStyles?: MeasurementStyleCache): T {
+  const previous = labelCache, previousStyles = styleCache, previousOwnership = ownershipCache;
+  labelCache = new WeakMap();
+  styleCache = retainedStyles ?? createMeasurementStyleCache(); ownershipCache = new WeakMap();
+  try { return withTextPseudoBatch(measure); } finally { labelCache = previous; styleCache = previousStyles; ownershipCache = previousOwnership; }
 }
 
 export function elementLabel(element: Element): string {
   // Generated display label only, deliberately independent of arbitrary page IDs/classes.
-  const siblings = element.parentElement ? [...element.parentElement.children].filter(item => item.tagName === element.tagName) : [element];
-  return `${element.localName}:nth-of-type(${siblings.indexOf(element) + 1})`;
+  const parent = element.parentElement;
+  if (!parent) return `${element.localName}:nth-of-type(1)`;
+  let entry = labelCache?.get(parent);
+  if (!entry) {
+    entry = { ordinals: new WeakMap(), counts: new Map(), next: parent.firstElementChild ?? parent.children[0] ?? null, examined: 0 };
+    labelCache?.set(parent, entry);
+  }
+  const known = entry.ordinals.get(element);
+  if (known !== undefined) return `${element.localName}:nth-of-type(${known})`;
+  while (entry.next && entry.examined < 20_000) {
+    const sibling = entry.next, siblingTag = sibling.tagName;
+    const ordinal = (entry.counts.get(siblingTag) ?? 0) + 1;
+    entry.counts.set(siblingTag, ordinal); entry.ordinals.set(sibling, ordinal);
+    entry.examined++;
+    entry.next = sibling.nextElementSibling === undefined ? parent.children[entry.examined] ?? null : sibling.nextElementSibling;
+    if (sibling === element) return `${element.localName}:nth-of-type(${ordinal})`;
+  }
+  // Labels are descriptive, never identity selectors. Avoid an invented ordinal
+  // when an unusually wide sibling list exceeds the display-label budget.
+  return element.localName;
 }
 
 function numeric(raw: string): number | null {
@@ -285,28 +383,49 @@ function emptyPseudoHasNoPaint(style: CSSStyleDeclaration): boolean {
   return ['""', "''"].includes(style.content) && boxHasNoPaint(style);
 }
 
-function paintingConditions(element: Element, geometry: readonly TextRunGeometry[]): { background: ColorValue; effectiveBackground: ReturnType<typeof resolveBackground>['rgba']; backgroundRange?: BackgroundRange; pseudos: { owner: Element; pseudo: string; style: CSSStyleDeclaration }[]; reasons: string[]; ownOpaqueBackground: boolean } {
+function hasMask(style: CSSStyleDeclaration): boolean {
+  // A boxless wrapper has no surface to mask. Multiple `none` layers also
+  // leave ordinary text unchanged; actual masks may fade the glyphs themselves.
+  return style.display !== 'contents' && !!style.maskImage?.trim()
+    && !/^none(?:\s*,\s*none)*$/.test(style.maskImage.trim());
+}
+
+function* iteratePaintingConditions(element: Element, geometry: readonly TextRunGeometry[]): Generator<null, { background: ColorValue; effectiveBackground: ReturnType<typeof resolveBackground>['rgba']; backgroundRange?: BackgroundRange; pseudos: { owner: Element; pseudo: string; style: CSSStyleDeclaration }[]; reasons: string[]; ownOpaqueBackground: boolean }> {
   const reasons = new Set<string>();
   const pseudos: { owner: Element; pseudo: string; style: CSSStyleDeclaration }[] = [];
   const layers: ColorValue[] = [];
+  const textPseudoBudget = { remaining: 256 };
   const gradientLayers: GradientBackgroundLayer[] = [];
   let hasGradient = false, unsupportedImage = false, gradientLayersLimited = false;
-  const ownStyle = getComputedStyle(element);
+  const ownStyle = measuredStyle(element);
   const own = parseColor(ownStyle.backgroundColor);
   let backgroundVisible = true;
+  let ownCoverage = false;
   let reachedDocumentRoot = false;
-  let knownCanvasPath = true;
+  let knownCanvasPath = true, depth = 0;
   for (let current: Element | null = element; current; current = current.parentElement) {
+    if (++depth > 512) { reasons.add('measurement-complexity-limit'); break; }
+    // Deep formatting ancestry must not make one selected text run an
+    // uninterruptible task. Geometry and paint decisions remain capture-local.
+    if (depth > 1 && depth % 8 === 1) yield null;
     if (current === element.ownerDocument?.documentElement) reachedDocumentRoot = true;
     // Light-DOM ancestors cannot establish a shadow surface or a top-layer
     // backdrop between this text and the document canvas.
     if (current.assignedSlot || current.shadowRoot
       || (current as Element & { readonly openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot
       || inTopLayer(current)) knownCanvasPath = false;
-    const style = getComputedStyle(current);
+    const style = measuredStyle(current);
+    const pseudoText = textPseudoStyle(current, geometry, measuredStyle, textPseudoBudget);
+    if (pseudoText) reasons.add(pseudoText === 'font' ? 'text-pseudo-font' : 'text-pseudo-style');
+    if (hasUnboundedPaintTransform(style)) reasons.add('background-coverage');
     // display:contents has no box to paint its declared background. Its
     // children still inherit text styles and may paint generated pseudo boxes.
-    if (backgroundVisible && style.display !== 'contents') {
+    const paintsBackground = parseColor(style.backgroundColor).rgba?.a !== 0 || style.backgroundImage !== 'none';
+    const coverage = backgroundVisible && paintsBackground && current.namespaceURI === 'http://www.w3.org/1999/xhtml'
+      ? backgroundPaintCoverage(current, element, style, geometry, measuredStyle) : 'covered';
+    if (backgroundVisible && paintsBackground && coverage === 'uncertain') reasons.add('background-coverage');
+    if (current === element) ownCoverage = coverage === 'covered';
+    if (backgroundVisible && style.display !== 'contents' && coverage !== 'outside') {
       const coveringImage = style.backgroundImage !== 'none' ? coveringOpaqueGradient(current, element, style, geometry) : null;
       const firstStop = coveringImage?.[0];
       const solidImage = firstStop && coveringImage!.every(stop => (['r', 'g', 'b', 'a'] as const).every(channel => stop[channel] === firstStop[channel])) ? firstStop : null;
@@ -335,10 +454,11 @@ function paintingConditions(element: Element, geometry: readonly TextRunGeometry
     }
     if (numeric(style.opacity) !== 1) reasons.add('group-opacity');
     if (style.filter !== 'none' || (style.backdropFilter && style.backdropFilter !== 'none')) reasons.add('filter');
+    if (hasMask(style)) reasons.add('mask');
     if (style.mixBlendMode !== 'normal') reasons.add('blend-mode');
     if (style.textShadow !== 'none') reasons.add('text-shadow');
     for (const pseudo of ['::before', '::after']) {
-      const pseudoStyle = getComputedStyle(current, pseudo);
+      const pseudoStyle = measuredStyle(current, pseudo);
       // Empty generated content can paint an overlay. Ignore it only when all
       // of its supported painting sources are demonstrably absent.
       if (pseudoStyle.content && !['none', 'normal'].includes(pseudoStyle.content) && pseudoStyle.display !== 'none'
@@ -362,7 +482,7 @@ function paintingConditions(element: Element, geometry: readonly TextRunGeometry
   const resolved = backgroundRange ? { rgba: null } : resolveBackground(layers);
   if ('reason' in resolved && resolved.reason) reasons.add(resolved.reason);
   if (unsupportedImage || (hasGradient && !backgroundRange)) reasons.add('background-image-or-gradient');
-  return { background: own, effectiveBackground: backgroundRange ? null : resolved.rgba, ...(backgroundRange ? { backgroundRange } : {}), pseudos, reasons: [...reasons], ownOpaqueBackground: ownStyle.display !== 'contents' && own.rgba?.a === 1 && ownStyle.backgroundImage === 'none' };
+  return { background: own, effectiveBackground: backgroundRange ? null : resolved.rgba, ...(backgroundRange ? { backgroundRange } : {}), pseudos, reasons: [...reasons], ownOpaqueBackground: ownCoverage && ownStyle.display !== 'contents' && own.rgba?.a === 1 && ownStyle.backgroundImage === 'none' };
 }
 
 function candidateMayPaint(candidate: Element, textRect: TextRunGeometry['rects'][number], budget: { remaining: number; limited: boolean }): boolean {
@@ -370,7 +490,7 @@ function candidateMayPaint(candidate: Element, textRect: TextRunGeometry['rects'
   while (pending.length) {
     if (budget.remaining-- <= 0) { budget.limited = true; return true; }
     const current = pending.pop()!;
-    const style = getComputedStyle(current);
+    const style = measuredStyle(current);
     if (style.display === 'none' || numeric(style.opacity) === 0) continue;
     // A hit-test box may be just transparent padding around a smaller icon.
     // Prove the light-DOM subtree cannot paint here; uncertain sources remain
@@ -379,7 +499,7 @@ function candidateMayPaint(candidate: Element, textRect: TextRunGeometry['rects'
       || current.shadowRoot || (current as Element & { readonly openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot
       || ['IMG', 'VIDEO', 'AUDIO', 'CANVAS', 'IFRAME', 'OBJECT', 'EMBED', 'INPUT', 'TEXTAREA', 'SELECT', 'METER', 'PROGRESS'].includes(current.tagName)) return true;
     for (const pseudo of ['::before', '::after']) {
-      const pseudoStyle = getComputedStyle(current, pseudo);
+      const pseudoStyle = measuredStyle(current, pseudo);
       if (pseudoStyle.content && !['none', 'normal'].includes(pseudoStyle.content) && pseudoStyle.display !== 'none'
         && !['hidden', 'collapse'].includes(pseudoStyle.visibility) && numeric(pseudoStyle.opacity) !== 0 && !emptyPseudoHasNoPaint(pseudoStyle)) return true;
     }
@@ -419,7 +539,7 @@ function hasInFlowBackground(element: Element, rect: TextRunGeometry['rects'][nu
   let examined = 0;
   for (let current: Element | null = element; current; current = current.parentElement) {
     if (++examined > 300 || current.namespaceURI !== 'http://www.w3.org/1999/xhtml') return false;
-    const style = getComputedStyle(current);
+    const style = measuredStyle(current);
     // An opaque positioned container still paints its own children's background.
     // Only transparent layers before that boundary can move text above siblings.
     if (style.display !== 'contents' && parseColor(style.backgroundColor).rgba?.a === 1) {
@@ -441,7 +561,7 @@ function hasInFlowBackground(element: Element, rect: TextRunGeometry['rects'][nu
       // and their authored layout; do not infer item status from that parent.
       && !['DETAILS', 'FIELDSET'].includes(parent.tagName)
       && !parent.shadowRoot && !(parent as Element & { readonly openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot
-      && ['flex', 'inline-flex', 'grid', 'inline-grid'].includes(getComputedStyle(parent).display);
+      && ['flex', 'inline-flex', 'grid', 'inline-grid'].includes(measuredStyle(parent).display);
     if (!['static', 'relative'].includes(style.position) || style.cssFloat !== 'none' && !ignoredFloat
       || [style.transform, style.translate, style.rotate, style.scale, style.perspective, style.offsetPath].some(value => value !== 'none')
       || !['1', 'normal'].includes(style.zoom)) return false;
@@ -462,12 +582,20 @@ function overlapConditions(element: Element, geometry?: TextRunGeometry): { reas
   // A stretched element's box can overlap a neighbour below its actual text.
   // Controls have no direct text-node ranges and retain their box sample.
   for (const originalRect of geometry?.rects ?? [element.getBoundingClientRect()]) {
-    const rect = geometry ? visibleTextSampleRect(element, originalRect) : originalRect;
+    let rect = geometry ? visibleTextSampleRect(element, originalRect) : originalRect;
+    // A long line or a partly scrolled row may be visible although its center
+    // lies outside the window. Sample its visible intersection; otherwise an
+    // overlay on that portion would never be checked. Fully offscreen text
+    // retains its normal offscreen handling, and coverage proofs below still
+    // use the full original fragment rather than this hit-test rectangle.
+    const left = Math.max(0, rect.left), top = Math.max(0, rect.top);
+    const right = Math.min(innerWidth, rect.left + rect.width), bottom = Math.min(innerHeight, rect.top + rect.height);
+    if (right > left && bottom > top) rect = { left, top, width: right - left, height: bottom - top };
     examinedRects++;
     const centerX = rect.left + rect.width / 2, centerY = rect.top + rect.height / 2;
     const inViewport = centerX >= 0 && centerX < innerWidth && centerY >= 0 && centerY < innerHeight;
     if (!inViewport) {
-      const style = getComputedStyle(element);
+      const style = measuredStyle(element);
       // Offscreen floating labels have no hit-test evidence for a sibling
       // surface. Normal text flow can still use its enclosing opaque background.
       if (style.pointerEvents === 'none' && parseColor(style.backgroundColor).rgba?.a !== 1 && !hasInFlowBackground(element, rect)) {
@@ -475,7 +603,11 @@ function overlapConditions(element: Element, geometry?: TextRunGeometry): { reas
         // A DOM association can supply only the same unverified CSS pair used
         // onscreen. It cannot establish actual paint order outside the viewport.
         if (offscreenInput === undefined) offscreenInput = singleSiblingInput(element);
-        const css = offscreenInput && siblingControlCssBackground(element, offscreenInput, rect);
+        // A fully enclosing authored surface can retain its mathematical CSS
+        // pair even when displacement prevents proving offscreen paint order.
+        // The layered-background reason remains: this never certifies page paint.
+        const css = offscreenInput ? siblingControlCssBackground(element, offscreenInput, rect)
+          : enclosingCssBackground(element, originalRect);
         if (css && (!cssBackground || (['r', 'g', 'b', 'a'] as const).every(key => cssBackground![key] === css[key]))) {
           cssBackground = css; cssResolvedRects++;
         }
@@ -524,15 +656,26 @@ function overlapConditions(element: Element, geometry?: TextRunGeometry): { reas
 }
 
 export function measureRuns(element: Element, registry: ElementRegistry, settings: Settings, count?: number, geometry: TextRunGeometry[] = []): TextRun[] {
+  return [...iterateMeasuredRuns(element, registry, settings, count, geometry)];
+}
+
+export function* iterateMeasuredRuns(element: Element, registry: ElementRegistry, settings: Settings, count?: number, geometry: TextRunGeometry[] = []): Generator<TextRun> {
+  for (const step of iterateMeasurementSteps(element, registry, settings, count, geometry)) if (step) yield step;
+}
+
+/** Shared paint is resolved from all collected fragments once. Null steps let
+ * callers yield during deep ancestor work, before the first run is available. */
+export function* iterateMeasurementSteps(element: Element, registry: ElementRegistry, settings: Settings, count?: number, geometry: TextRunGeometry[] = []): Generator<TextRun | null> {
   count ??= directTextCount(element, Infinity, geometry);
-  if (!count || hiddenButtonText(element)) return [];
+  if (!count || hiddenButtonText(element)) return;
   const placeholder = placeholderStyle(element);
-  if (placeholder && hiddenPlaceholder(element, placeholder)) return [];
-  const style = placeholder ?? getComputedStyle(element);
+  if (placeholder && hiddenPlaceholder(element, placeholder)) return;
+  const style = placeholder ?? measuredStyle(element);
   let foreground = parseColor(style.color);
-  const paint = paintingConditions(element, geometry.slice(0, count));
-  const fontSizeCssPx = numeric(style.fontSize);
-  const fontWeight = style.fontWeight === 'bold' ? 700 : style.fontWeight === 'normal' ? 400 : numeric(style.fontWeight);
+  const paint = yield* iteratePaintingConditions(element, geometry.slice(0, count));
+  const uncertainFont = paint.reasons.includes('text-pseudo-font');
+  const fontSizeCssPx = uncertainFont ? null : numeric(style.fontSize);
+  const fontWeight = uncertainFont ? null : style.fontWeight === 'bold' ? 700 : style.fontWeight === 'normal' ? 400 : numeric(style.fontWeight);
   const reasons = [...paint.reasons];
   let foregroundSource: TextRun['foregroundSource'];
   const fill = style.getPropertyValue?.('-webkit-text-fill-color')?.trim();
@@ -557,6 +700,7 @@ export function measureRuns(element: Element, registry: ElementRegistry, setting
     const background = parseColor(placeholder.backgroundColor);
     if (background.rgba?.a !== 0 || placeholder.backgroundImage !== 'none') reasons.push('pseudo-element');
     if (placeholder.filter !== 'none' || (placeholder.backdropFilter && placeholder.backdropFilter !== 'none')) reasons.push('filter');
+    if (hasMask(placeholder)) reasons.push('mask');
     if (placeholder.mixBlendMode !== 'normal') reasons.push('blend-mode');
     if (placeholder.textShadow !== 'none') reasons.push('text-shadow');
   } else if (element.tagName === 'INPUT') reasons.push('control-text-availability-unknown');
@@ -565,7 +709,7 @@ export function measureRuns(element: Element, registry: ElementRegistry, setting
   const notApplicable = disabled ? 'inactive-control' : undefined;
   const elementRef = registry.reference(element);
   const selector = elementLabel(element);
-  return Array.from({ length: count }, (_, index) => {
+  for (let index = 0; index < count; index++) {
     const overlap = overlapConditions(element, geometry[index]);
     const runReasons = [...reasons, ...overlap.reasons];
     if (paint.pseudos.some(item => !pseudoIsSeparated(item.owner, element, item.pseudo, item.style, geometry[index]))) runReasons.push('pseudo-element');
@@ -575,23 +719,37 @@ export function measureRuns(element: Element, registry: ElementRegistry, setting
     // Controls have no Text node. Keep their synthetic IDs in a disjoint
     // namespace so they cannot alias a measured DOM Text object's identity.
     const textNode = geometry[index]?.identityNode;
-    return {
+    yield {
       id: textNode ? registry.textReference(element, textNode) : `${elementRef}:text${index + 1}`, elementRef, tagName: element.localName, selector,
+      ...(geometry[index]?.viewportPartial ? { viewportPartial: true as const } : {}),
       ...(placeholder ? { textSource: 'placeholder' as const } : {}),
       ...(foregroundSource ? { foregroundSource } : {}),
       ...(fill ? { textFillPresent: true } : {}),
-      fontSizeCssPx, fontWeight, foreground, background: paint.background, effectiveBackground,
+      fontSizeCssPx, fontWeight, fontFamily: style.fontFamily, lineHeight: style.lineHeight,
+      foreground, background: paint.background, effectiveBackground,
       ...(backgroundRange ? { backgroundRange } : {}),
       ownOpaqueBackground: paint.ownOpaqueBackground, reasons: runReasons, notApplicable,
       contrast: evaluateContrast({ foreground: foreground.rgba, background: effectiveBackground, backgroundRange, fontSizeCssPx, fontWeight, target: settings.contrastTarget, reasons: runReasons, notApplicable }),
       fontSize: evaluateFontSize(fontSizeCssPx, notApplicable),
     };
-  });
+  }
 }
 
 export function measureSnapshot(element: Element, identity: DocumentIdentity, registry: ElementRegistry, settings: Settings, options: { includeText?: boolean } = {}): Snapshot {
+  return withMeasurementBatch(() => {
+    const capture = iterateSnapshot(element, identity, registry, settings, options);
+    let item = capture.next();
+    while (!item.done) item = capture.next();
+    return item.value;
+  });
+}
+
+/** The caller owns scheduling and cancellation. Yield for every geometry/run
+ * step, including empty elements, so a single large selection is cooperative. */
+export function* iterateSnapshot(element: Element, identity: DocumentIdentity, registry: ElementRegistry, settings: Settings,
+  options: { includeText?: boolean; onRun?: (run: TextRun) => void } = {}): Generator<void, Snapshot> {
   if (!element.isConnected) throw new Error('element-removed');
-  const style = getComputedStyle(element);
+  const style = measuredStyle(element);
   const styles: Snapshot['styles'] = { colors: {}, typography: {}, layout: {} };
   for (const group of Object.keys(PROPERTIES) as (keyof typeof PROPERTIES)[]) {
     for (const property of PROPERTIES[group]) styles[group][property] = style.getPropertyValue(property).slice(0, 1024);
@@ -606,18 +764,25 @@ export function measureSnapshot(element: Element, identity: DocumentIdentity, re
   while (current && examined++ < 300 && textRuns.length < 100) {
     const remaining = 100 - textRuns.length;
     const geometry: TextRunGeometry[] = [];
-    const count = directTextCount(current, remaining + 1, geometry, options.includeText);
+    let count = 0;
+    for (const item of iterateDirectText(current, remaining + 1, options.includeText)) {
+      if (item) { count++; if (item !== 'control') geometry.push(item); }
+      yield;
+    }
     truncatedText ||= count > remaining;
-    const runs = measureRuns(current, registry, settings, Math.min(count, remaining), geometry);
-    if (options.includeText) for (const [index, run] of runs.entries()) {
+    let index = 0;
+    for (const run of iterateMeasurementSteps(current, registry, settings, Math.min(count, remaining), geometry)) {
+      if (!run) { yield; continue; }
       const node = geometry[index]?.textNode;
-      if (node) {
+      if (options.includeText && node) {
         run.textExcerpt = readTextExcerpt(node, textBudget);
         textParts.push({ node, excerpt: run.textExcerpt });
       }
+      textRuns.push(run); options.onRun?.(run); index++;
+      yield;
     }
-    textRuns.push(...runs);
     current = walker.nextNode() as Element | null;
+    yield;
   }
   const rect = element.getBoundingClientRect();
   // Runs are grouped by element. The combined excerpt instead follows DOM text order.

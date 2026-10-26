@@ -10,6 +10,7 @@ export interface Settings {
   contrastTarget: ContrastTarget;
   livePreview: boolean;
   contextMenuEnabled: boolean;
+  showDiagnostics: boolean;
 }
 /** Encoded sRGB channels 0..255 (floats preserved), alpha 0..1. */
 export interface RGBA { r: number; g: number; b: number; a: number }
@@ -40,8 +41,12 @@ export interface TextRun {
   foregroundSource?: 'text-fill';
   /** A foreground correction must also make the resolved fill follow color. */
   textFillPresent?: boolean;
+  /** The viewport audit omitted positive text fragments outside its bounds. */
+  viewportPartial?: true;
   textExcerpt?: TextExcerpt;
   fontSizeCssPx: number | null; fontWeight: number | null;
+  /** Computed CSS values for this text run, including placeholder overrides. */
+  fontFamily?: string; lineHeight?: string;
   foreground: ColorValue; background: ColorValue; effectiveBackground: RGBA | null;
   backgroundRange?: BackgroundRange;
   ownOpaqueBackground: boolean;
@@ -64,11 +69,36 @@ export interface RuleCounts { pass: number; fail: number; manual: number; notApp
 export interface AuditCounts {
   contrast: RuleCounts; fontSize: RuleCounts; findings: number; affectedRuns: number; checks: number;
 }
+export type PaletteRole = 'background' | 'text' | 'accent' | 'other';
+export type PaletteSort = 'usage' | 'frequency' | 'hue';
+/** Counts describe distinct measured text elements, never painted area. */
+export interface PaletteUsage { color: ColorValue; count: number; roles: Partial<Record<PaletteRole, number>>; elementRefs?: string[] }
+export interface FontVariant { sizeCssPx: number | null; fontWeight: number | null; lineHeight: string; count: number; elementRefs?: string[] }
+export interface FontUsage {
+  family: string; count: number; elementRefs?: string[];
+  sizes: Array<{ sizeCssPx: number | null; count: number; elementRefs?: string[] }>;
+  variants?: FontVariant[];
+}
+export type AuditScope = 'page' | 'viewport' | 'selection';
+export type InventoryLimit = 'colors' | 'font-families' | 'font-sizes' | 'font-variants' | 'elements';
+export interface InventoryLimits {
+  maxColors: number; maxFontFamilies: number; maxFontSizes: number; maxFontVariants: number; maxElements: number;
+  reached: InventoryLimit[];
+}
 export interface Audit {
   id: string; document: DocumentIdentity; measuredAt: string; viewport: Viewport;
   target: ContrastTarget; status: 'running' | 'complete' | 'cancelled' | 'partial';
   stale: boolean; scanned: number; skipped: number; total: number; reasons: string[];
   runs: TextRun[]; palette: ColorValue[]; fonts: string[]; counts: AuditCounts;
+  /** Optional for sessions captured before usage inventories were introduced. */
+  paletteUsage?: PaletteUsage[]; fontUsage?: FontUsage[];
+  /** Optional for older session snapshots. Scope changes only on an explicit scan. */
+  scope?: AuditScope; rootElementRef?: string;
+  scopeViewport?: { left: number; top: number; width: number; height: number };
+  inventoryLimits?: InventoryLimits;
+  durationMs?: number; examined?: number;
+  limits?: { maxRuns: number; maxElements: number };
+  reachedLimits?: ('text-runs' | 'elements' | 'complexity')[];
 }
 export interface ContrastSuggestion {
   id: string; snapshotId: string; runId: string; target: ContrastTarget;
@@ -89,6 +119,8 @@ export type ExportSource =
 export interface ExportOptions {
   format: ExportFormat; scope?: ExportScope; colorFormat?: ColorFormat;
   version: string; className?: string; target?: ContrastTarget;
+  /** Page tokens: overview usage (including placeholders) or raw element CSS. */
+  inventory?: 'measured' | 'css';
 }
 export interface ExportWarning { code: string; property?: string; detail?: string }
 export interface ExportResult { filename: string; mimeType: string; text: string; warnings: ExportWarning[]; classes?: string }

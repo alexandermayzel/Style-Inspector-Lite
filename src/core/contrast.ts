@@ -93,19 +93,29 @@ export function auditMeasurementsChanged(audit: Audit, snapshot: Snapshot, compl
     || (['windowId', 'tabId', 'frameId', 'documentToken'] as const).some(key => audit.document[key] !== snapshot.document[key])) return false;
   const observed = new Map(snapshot.textRuns.map(run => [run.id, run]));
   const channels = (color: RGBA | null | undefined) => color ? [color.r, color.g, color.b, color.a] : null;
-  const inputs = (run: TextRun) => JSON.stringify([
+  const inputs = (run: TextRun, compareGeometry = true) => JSON.stringify([
     run.elementRef, run.textSource ?? null, run.foregroundSource ?? null, run.textFillPresent ?? false, run.fontSizeCssPx, run.fontWeight,
+    run.fontFamily ?? null, run.lineHeight ?? null,
     channels(run.foreground.rgba), run.foreground.rgba ? null : run.foreground.raw,
     channels(run.background.rgba), run.background.rgba ? null : run.background.raw,
-    channels(run.effectiveBackground), channels(run.backgroundRange?.min), channels(run.backgroundRange?.max),
-    run.ownOpaqueBackground, [...new Set(run.reasons)].sort(), run.notApplicable ?? null,
+    run.ownOpaqueBackground, run.notApplicable ?? null,
+    ...(compareGeometry ? [channels(run.effectiveBackground), channels(run.backgroundRange?.min), channels(run.backgroundRange?.max), [...new Set(run.reasons)].sort()] : []),
   ]);
-  let directCount = 0;
+  let directCount = 0, missingDirect = false;
   for (const previous of audit.runs) {
-    if (previous.elementRef === snapshot.elementRef) directCount++;
     const current = observed.get(previous.id);
-    if (current && inputs(previous) !== inputs(current)) return true;
+    if (previous.elementRef === snapshot.elementRef) { directCount++; missingDirect ||= !current; }
+    // A viewport-only fragment and the whole Text node share CSS inputs but
+    // can legitimately have different overlap and background evidence.
+    const compareGeometry = !(audit.scope === 'viewport' && previous.viewportPartial === true);
+    if (current && inputs(previous, compareGeometry) !== inputs(current, compareGeometry)) return true;
   }
+  // Viewport scans intentionally omit offscreen Text nodes, including further
+  // direct nodes in an otherwise visible element. Inspection measures the
+  // whole element: added nodes alone prove nothing, but the disappearance of
+  // an actually audited node from a complete inspection still contradicts it.
+  if (audit.scope === 'viewport') return audit.status !== 'running'
+    && !snapshot.reasons.includes('selection-text-limit') && missingDirect;
   // A complete follow-up can also disprove a selected descendant's measured
   // Text identity. Require evidence that its owner belonged to the preceding
   // page audit: an omitted/shadow-root selection is not a missing page run.
@@ -123,5 +133,5 @@ export function auditMeasurementsChanged(audit: Audit, snapshot: Snapshot, compl
   const direct = snapshot.textRuns.filter(run => run.elementRef === snapshot.elementRef);
   return audit.status !== 'running' && (directCount > 0 || completingScan && audit.status === 'complete')
     && !snapshot.reasons.includes('selection-text-limit')
-    && (directCount !== direct.length || audit.runs.some(run => run.elementRef === snapshot.elementRef && !observed.has(run.id)));
+    && (directCount !== direct.length || missingDirect);
 }

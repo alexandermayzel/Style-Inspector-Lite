@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Preformatted counter visibility</title>
+<style>
+  html, body { margin: 0; background: #0f0f0f; color: #f1f1f1; font: 14px/20px Arial, sans-serif; }
+  #cases { display: grid; grid-template-columns: repeat(3, 220px); gap: 60px 36px; padding: 80px; }
+  .case { position: relative; height: 50px; }
+  .clip { overflow: hidden; width: 120px; height: 20px; }
+  .track { display: block; white-space: pre; margin-top: -40px; }
+  .track > div { height: 20px; }
+  .translated .track { margin-top: 0; transform: translateY(-40px); }
+  .masked .clip { mask-image: linear-gradient(black, black); }
+  .italic { font-style: italic; }
+  .single .track { margin-top: -60px; }
+  .partial .track { margin-top: -12px; }
+  .fixed .track { position: fixed; left: 800px; top: 90px; margin-top: 0; }
+  .escaped { position: static; }
+  .escaped .track { position: absolute; left: 800px; top: 150px; margin-top: 0; }
+  .shadow .track { text-shadow: 0 60px white; }
+  .filtered .track { filter: drop-shadow(0 60px white); }
+  .offscreen { position: absolute; top: 1600px; left: 80px; }
+  .offscreen .clip { overflow: visible; }
+  .offscreen .track { margin-top: 0; }
+  #cover { display: none; position: absolute; left: 0; top: 0; width: 120px; height: 20px; z-index: 5; background: #a00000; }
+</style>
+<div id="cases"></div>
+<script>
+  const cases = document.getElementById('cases');
+  for (const kind of ['margin', 'translated', 'masked', 'italic']) {
+    const row = document.createElement('div'); row.className = `case ${kind}`; row.id = `${kind}-case`;
+    const clip = document.createElement('div'); clip.className = 'clip';
+    const track = document.createElement('synthetic-counter'); track.className = 'track';
+    for (let index = 0; index < 5; index++) {
+      const digit = document.createElement('div'); digit.id = `${kind}-${index}`;
+      digit.dataset.expected = index === 2 ? 'visible' : 'clipped'; digit.textContent = String(index + 2);
+      track.append(digit);
+    }
+    clip.append(track); row.append(clip); cases.append(row);
+  }
+  const singles = [
+    ['partial', '7', 'visible'], ['fixed', '8', 'visible'], ['escaped', '9', 'visible'],
+    ['shadow', '6', 'visible'], ['filtered', '5', 'visible'], ['offscreen', '4', 'visible'],
+    ['leading-space', ' 3', 'visible'], ['trailing-space', '3 ', 'visible'],
+    ['repeated-space', '2  3', 'visible'], ['ordinary-space', '2 3', 'visible'],
+    ['tab', '2\t3', 'visible'], ['newline', '2\n3', 'visible'],
+    ['carriage-return', '2\r3', 'visible'], ['form-feed', '2\f3', 'visible'],
+  ];
+  for (const [kind, text, expected] of singles) {
+    const row = document.createElement('div'); row.className = `case single ${kind}`;
+    const clip = document.createElement('div'); clip.className = 'clip';
+    const track = document.createElement('synthetic-counter'); track.className = 'track';
+    const digit = document.createElement('div'); digit.id = kind; digit.dataset.expected = expected; digit.textContent = text;
+    track.append(digit); clip.append(track); row.append(clip); cases.append(row);
+  }
+  const cover = document.createElement('div'); cover.id = 'cover'; document.getElementById('margin-case').append(cover);
+</script>
+</html>
